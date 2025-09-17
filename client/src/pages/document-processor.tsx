@@ -54,6 +54,7 @@ export default function DocumentProcessor() {
     fields: [] as string[]
   });
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; status: string }>>([]);
+  const [showAllFields, setShowAllFields] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -387,7 +388,9 @@ export default function DocumentProcessor() {
                   <h2 className="text-lg font-semibold text-foreground mb-4">Extracted Data</h2>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(currentJob.extractedData).slice(0, 6).map(([field, value]) => (
+                    {Object.entries(currentJob.extractedData)
+                      .slice(0, showAllFields ? undefined : 6)
+                      .map(([field, value]) => (
                       <div key={field} className="space-y-2">
                         <Label htmlFor={field} className="text-sm font-medium text-foreground">
                           {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -404,8 +407,15 @@ export default function DocumentProcessor() {
                   </div>
                   
                   <div className="flex justify-between mt-6">
-                    <Button variant="secondary" data-testid="button-show-all-fields">
-                      Show All Fields ({Object.keys(currentJob.extractedData).length})
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => setShowAllFields(!showAllFields)}
+                      data-testid="button-show-all-fields"
+                    >
+                      {showAllFields 
+                        ? `Show Less (${Object.keys(currentJob.extractedData).length > 6 ? '6' : Object.keys(currentJob.extractedData).length})` 
+                        : `Show All Fields (${Object.keys(currentJob.extractedData).length})`
+                      }
                     </Button>
                     <Button 
                       onClick={() => updateJobMutation.mutate({ 
