@@ -35,8 +35,7 @@ Return ONLY a JSON object with field names as keys and extracted values as strin
           { role: "system", content: systemPrompt },
           { role: "user", content: `Extract structured data from this OCR text:\n\n${ocrText}` }
         ],
-        response_format: { type: "json_object" },
-        temperature: 0.1, // Low temperature for consistent extraction
+        response_format: { type: "json_object" }
       });
 
       const extractedData = JSON.parse(response.choices[0].message.content || '{}');
@@ -66,8 +65,7 @@ Only include mappings where you're confident about the match. If no good match e
           { role: "system", content: systemPrompt },
           { role: "user", content: "Create the field mapping." }
         ],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
+        response_format: { type: "json_object" }
       });
 
       const fieldMappings = JSON.parse(response.choices[0].message.content || '{}');
