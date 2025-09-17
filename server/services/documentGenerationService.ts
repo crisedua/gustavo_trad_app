@@ -1,8 +1,94 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Template, TemplateFieldMappings } from '@shared/schema';
 
 export class DocumentGenerationService {
+  // New method that handles both manual and auto-created templates
+  async fillPDFTemplateWithTemplate(template: Template, extractedFieldValues: Record<string, string>): Promise<Buffer> {
+    try {
+      // Resolve the template path
+      let resolvedPath = template.filePath;
+      if (template.filePath.startsWith('/') && !template.filePath.startsWith('/home') && !template.filePath.startsWith('/usr')) {
+        resolvedPath = path.join(process.cwd(), template.filePath.substring(1));
+      }
+      
+      console.log(`Reading template from: ${resolvedPath}`);
+      console.log(`Template type: ${template.isAutoCreated ? 'auto-created' : 'manual'}`);
+      
+      // Read the template file
+      const templateBytes = fs.readFileSync(resolvedPath);
+      
+      // Load the PDF
+      const pdfDoc = await PDFDocument.load(templateBytes);
+      
+      // Get the form
+      const form = pdfDoc.getForm();
+      const fields = form.getFields();
+      
+      console.log(`Found ${fields.length} form fields in template`);
+      
+      // Try to fill existing form fields first (for both manual and auto-created templates)
+      if (fields.length > 0) {
+        console.log('Attempting to fill existing form fields...');
+        
+        let fieldsFilledCount = 0;
+        for (const [fieldName, value] of Object.entries(extractedFieldValues)) {
+          try {
+            // For auto-created templates, also try AcroForm field names if available
+            const templateField = template.fieldMappings[fieldName];
+            let formFieldName = fieldName;
+            
+            if (templateField?.instances?.[0]?.acroForm?.fieldName) {
+              formFieldName = templateField.instances[0].acroForm.fieldName;
+            }
+            
+            const field = form.getTextField(formFieldName);
+            if (field) {
+              field.setText(value);
+              console.log(`Filled form field ${formFieldName} with: ${value}`);
+              fieldsFilledCount++;
+            }
+          } catch (error) {
+            // Try the original field name if AcroForm name fails
+            try {
+              const field = form.getTextField(fieldName);
+              if (field) {
+                field.setText(value);
+                console.log(`Filled form field ${fieldName} with: ${value}`);
+                fieldsFilledCount++;
+              }
+            } catch (innerError) {
+              console.warn(`Could not fill field ${fieldName}:`, error instanceof Error ? error.message : String(error));
+            }
+          }
+        }
+        
+        if (fieldsFilledCount > 0) {
+          console.log(`Successfully filled ${fieldsFilledCount} form fields`);
+          form.flatten();
+          const filledPdfBytes = await pdfDoc.save();
+          return Buffer.from(filledPdfBytes);
+        }
+      }
+      
+      // No form fields filled - use coordinate-based approach for auto-created templates
+      if (template.isAutoCreated && template.fieldMappings) {
+        console.log('Using coordinate-based field placement for auto-created template...');
+        return await this.fillPDFWithCoordinates(pdfDoc, template.fieldMappings, extractedFieldValues);
+      }
+      
+      // Fallback to legacy method for manual templates without form fields
+      console.log('No form fields found, using legacy PDF creation...');
+      return await this.createPDFFromZero(extractedFieldValues);
+      
+    } catch (error) {
+      console.error('PDF template filling failed:', error);
+      throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // Legacy method for backward compatibility
   async fillPDFTemplate(templatePath: string, fieldMappings: Record<string, string>): Promise<Buffer> {
     try {
       // Resolve the template path - if it starts with '/' but isn't a system path, treat it as relative
@@ -289,6 +375,94 @@ export class DocumentGenerationService {
     }
   }
   
+  /**
+   * Fill PDF using coordinate-based field mappings from auto-created templates
+   */
+  private async fillPDFWithCoordinates(
+    pdfDoc: PDFDocument, 
+    fieldMappings: TemplateFieldMappings, 
+    extractedFieldValues: Record<string, string>
+  ): Promise<Buffer> {
+    try {
+      console.log('Filling PDF using coordinate-based approach...');
+      
+      // Embed fonts
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      let fieldsPlacedCount = 0;
+      
+      // Process each field mapping
+      for (const [fieldName, fieldMapping] of Object.entries(fieldMappings)) {
+        const value = extractedFieldValues[fieldName];
+        if (!value || !fieldMapping.instances || fieldMapping.instances.length === 0) {
+          console.log(`Skipping field ${fieldName}: no value or instances`);
+          continue;
+        }
+        
+        // Use the first instance for now (could be enhanced to handle multiple instances)
+        const instance = fieldMapping.instances[0];
+        const coordinates = instance.coordinates;
+        
+        try {
+          // Get the page (convert from 1-based to 0-based indexing)
+          const pageIndex = coordinates.page - 1;
+          const pages = pdfDoc.getPages();
+          
+          if (pageIndex < 0 || pageIndex >= pages.length) {
+            console.warn(`Page ${coordinates.page} not found for field ${fieldName}`);
+            continue;
+          }
+          
+          const page = pages[pageIndex];
+          const { height: pageHeight } = page.getSize();
+          
+          // Convert coordinates if needed (our schema uses bottom-left origin, same as PDF)
+          let x = coordinates.rect.x;
+          let y = coordinates.rect.y;
+          
+          // If the coordinates seem to be from top-left origin, convert them
+          if (y > pageHeight / 2 && instance.ocrText) {
+            // Likely top-left origin, convert to bottom-left
+            y = pageHeight - y - coordinates.rect.height;
+          }
+          
+          // Determine font size based on field height
+          const fontSize = Math.min(12, Math.max(8, coordinates.rect.height * 0.7));
+          
+          // Choose font based on field type
+          const useFont = fieldMapping.fieldDefinition.type === 'text' ? font : font;
+          
+          // Draw the text
+          page.drawText(value, {
+            x: x,
+            y: y,
+            size: fontSize,
+            font: useFont,
+            color: rgb(0, 0, 0),
+            maxWidth: coordinates.rect.width,
+          });
+          
+          console.log(`Placed field ${fieldName} at (${x}, ${y}) with value: ${value}`);
+          fieldsPlacedCount++;
+          
+        } catch (error) {
+          console.error(`Failed to place field ${fieldName}:`, error instanceof Error ? error.message : String(error));
+        }
+      }
+      
+      console.log(`Successfully placed ${fieldsPlacedCount} fields using coordinates`);
+      
+      // Save the PDF
+      const filledPdfBytes = await pdfDoc.save();
+      return Buffer.from(filledPdfBytes);
+      
+    } catch (error) {
+      console.error('Coordinate-based PDF filling failed:', error);
+      throw error;
+    }
+  }
+
   private drawLabelValuePair(page: any, font: any, x: number, y: number, label: string, value: string) {
     // Draw label
     page.drawText(label, {
