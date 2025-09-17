@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,22 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, FileText, Trash2, Edit, Calendar, Upload, Settings, ArrowLeft, HelpCircle, AlertTriangle } from "lucide-react";
+import { Plus, FileText, Trash2, Edit, Calendar, Upload, Settings, ArrowLeft, HelpCircle, AlertTriangle, CheckCircle, Eye, Target, Zap, BarChart3, Download } from "lucide-react";
 import { Link } from "wouter";
 import { Template, getFieldNamesFromMappings } from "@shared/schema";
+
+interface AnalysisResult {
+  fieldsDetected: number;
+  analysisSuccessful: boolean;
+  processingTime: number;
+  confidence?: number;
+  detectionMethod?: string;
+  totalMarkersFound?: number;
+}
 
 export default function TemplateAdmin() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -25,6 +36,13 @@ export default function TemplateAdmin() {
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<Template | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Edit state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -64,34 +82,101 @@ export default function TemplateAdmin() {
     },
   });
 
-  // Create template mutation
+  // Create template mutation with enhanced progress tracking
   const createTemplateMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const res = await fetch('/api/templates', {
-        method: 'POST',
-        body: formData,
+      // Create XMLHttpRequest for progress tracking
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = (e.loaded / e.total) * 50; // Upload is first 50%
+            setUploadProgress(progress);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          setUploadProgress(50); // Upload complete, analysis starts
+          setIsAnalyzing(true);
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result);
+            } catch (error) {
+              reject(new Error('Failed to parse response'));
+            }
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              reject(new Error(errorData.error || 'Failed to create template'));
+            } catch {
+              reject(new Error('Failed to create template'));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+        
+        xhr.open('POST', '/api/templates');
+        xhr.send(formData);
+        
+        // Simulate analysis progress
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 95) {
+              clearInterval(progressInterval);
+              return prev;
+            }
+            return prev + 1;
+          });
+        }, 100);
       });
+    },
+    onSuccess: (data: any) => {
+      setUploadProgress(100);
+      setIsAnalyzing(false);
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to create template');
+      // Store analysis results for display
+      if (data.analysisResults) {
+        setAnalysisResults({
+          fieldsDetected: data.analysisResults.fieldsDetected || 0,
+          analysisSuccessful: data.analysisResults.analysisSuccessful || false,
+          processingTime: data.analysisResults.processingTime || 0,
+          confidence: data.detectionMetadata?.confidence,
+          detectionMethod: data.detectionMetadata?.detectionMethod,
+          totalMarkersFound: data.detectionMetadata?.totalMarkersFound
+        });
       }
       
-      return res.json();
-    },
-    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
-      setIsCreateModalOpen(false);
-      setCreateForm({ name: '', description: '', fields: [] });
-      setSelectedFile(null);
+      
+      // Show success with analysis results
+      const fieldsFound = data.analysisResults?.fieldsDetected || 0;
       toast({
-        title: "Template Created",
-        description: "Template has been successfully created.",
+        title: "Template Created Successfully! 🎉",
+        description: `Analysis complete: ${fieldsFound} fields detected automatically.`,
       });
+      
+      // Keep modal open briefly to show results, then close
+      setTimeout(() => {
+        setIsCreateModalOpen(false);
+        setCreateForm({ name: '', description: '', fields: [] });
+        setSelectedFile(null);
+        setAnalysisResults(null);
+        setUploadProgress(0);
+      }, 3000);
     },
     onError: (error: any) => {
+      setUploadProgress(0);
+      setIsAnalyzing(false);
+      setAnalysisResults(null);
       toast({
-        title: "Creation Failed", 
+        title: "Creation Failed",
         description: error.message || "Failed to create template",
         variant: "destructive",
       });
@@ -170,31 +255,69 @@ export default function TemplateAdmin() {
     updateTemplateMutation.mutate({ id: editingTemplate.id, updates });
   };
 
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileValidation(files[0]);
+    }
+  }, []);
+
+  // File validation helper
+  const handleFileValidation = (file: File) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/png',
+      'image/jpeg',
+      'image/jpg'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please select a PDF, DOCX, PNG, or JPEG file.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast({
+        title: "File Too Large",
+        description: "Please select a file smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedFile(file);
+  };
+
   // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Invalid File Type",
-          description: "Please select a PDF or DOCX file.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        toast({
-          title: "File Too Large",
-          description: "Please select a file smaller than 10MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      setSelectedFile(file);
+      handleFileValidation(file);
     }
+  };
+
+  // Handle template preview
+  const handlePreviewTemplate = (template: Template) => {
+    setPreviewingTemplate(template);
+    setIsPreviewModalOpen(true);
   };
 
   // Handle form submission
@@ -218,20 +341,36 @@ export default function TemplateAdmin() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     
     const formData = new FormData();
     formData.append('name', createForm.name.trim());
     formData.append('description', createForm.description.trim());
     formData.append('fields', JSON.stringify(createForm.fields));
     formData.append('templateFile', selectedFile);
+    formData.append('autoAnalyze', 'true'); // Enable automatic analysis
 
     createTemplateMutation.mutate(formData);
   };
 
-  // Format date
-  const formatDate = (dateString: string) => {
+  // Helper function to get detection confidence badge color
+  const getConfidenceBadgeColor = (confidence?: number) => {
+    if (!confidence) return 'secondary';
+    if (confidence >= 0.8) return 'default'; // Green
+    if (confidence >= 0.6) return 'secondary'; // Yellow  
+    return 'destructive'; // Red
+  };
+
+  // Helper function to format confidence percentage
+  const formatConfidence = (confidence?: number) => {
+    return confidence ? `${Math.round(confidence * 100)}%` : 'N/A';
+  };
+
+  // Format date - handle both Date objects and strings
+  const formatDate = (dateInput: string | Date) => {
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+      return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -287,13 +426,71 @@ export default function TemplateAdmin() {
                 Add Template
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md" data-testid="dialog-create-template">
+            <DialogContent className="max-w-2xl" data-testid="dialog-create-template">
               <DialogHeader>
-                <DialogTitle>Create New Template</DialogTitle>
+                <DialogTitle className="flex items-center space-x-2">
+                  <Zap className="h-5 w-5 text-primary" />
+                  <span>Create New Template with AI Detection</span>
+                </DialogTitle>
                 <DialogDescription>
-                  Upload a document template with placeholders for automated processing.
+                  Upload a document template with XXX markers. Our AI will automatically detect and map fields for you.
                 </DialogDescription>
               </DialogHeader>
+              
+              {/* Upload Progress and Analysis Results */}
+              {(isUploading || analysisResults) && (
+                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                  {isUploading && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center space-x-2">
+                          <Upload className="h-4 w-4 animate-pulse" />
+                          <span>{isAnalyzing ? 'Analyzing template...' : 'Uploading...'}</span>
+                        </span>
+                        <span>{Math.round(uploadProgress)}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="w-full" data-testid="upload-progress" />
+                      {isAnalyzing && (
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <Target className="h-3 w-3 animate-spin" />
+                          <span>Detecting XXX markers and analyzing field positions...</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {analysisResults && !isUploading && (
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2 text-green-600">
+                        <CheckCircle className="h-5 w-5" />
+                        <span className="font-medium">Analysis Complete!</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Target className="h-4 w-4 text-blue-500" />
+                          <span>Fields Detected: <strong>{analysisResults.fieldsDetected}</strong></span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <BarChart3 className="h-4 w-4 text-green-500" />
+                          <span>Processing: <strong>{analysisResults.processingTime}ms</strong></span>
+                        </div>
+                        {analysisResults.totalMarkersFound && (
+                          <div className="flex items-center space-x-2">
+                            <Zap className="h-4 w-4 text-yellow-500" />
+                            <span>Markers Found: <strong>{analysisResults.totalMarkersFound}</strong></span>
+                          </div>
+                        )}
+                        {analysisResults.confidence && (
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="h-4 w-4 text-purple-500" />
+                            <span>Confidence: <strong>{formatConfidence(analysisResults.confidence)}</strong></span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="space-y-4">
                 <div>
@@ -323,28 +520,90 @@ export default function TemplateAdmin() {
                   <Label htmlFor="templateFile">Template File *</Label>
                   <div className="mt-2">
                     <input
+                      ref={fileInputRef}
                       id="templateFile"
                       type="file"
-                      accept=".pdf,.docx"
+                      accept=".pdf,.docx,.png,.jpg,.jpeg"
                       onChange={handleFileSelect}
                       className="hidden"
                       data-testid="input-template-file"
                     />
-                    <Button
-                      variant="outline"
-                      onClick={() => document.getElementById('templateFile')?.click()}
-                      className="w-full justify-center"
-                      data-testid="button-select-file"
+                    
+                    {/* Drag and Drop Area */}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                        isDragOver 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-muted-foreground/25 hover:border-primary/50'
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      data-testid="file-drop-area"
                     >
-                      <Upload className="h-4 w-4 mr-2" />
-                      {selectedFile ? selectedFile.name : 'Select PDF or DOCX file'}
-                    </Button>
+                      {selectedFile ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-center space-x-2 text-green-600">
+                            <CheckCircle className="h-5 w-5" />
+                            <span className="font-medium">{selectedFile.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                          </p>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            data-testid="button-change-file"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Change File
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex justify-center">
+                            <Upload className={`h-12 w-12 ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`} />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                              {isDragOver ? 'Drop your file here' : 'Drag & drop your template file'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              or click to browse files
+                            </p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => fileInputRef.current?.click()}
+                            data-testid="button-select-file"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Select File
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Supports PDF, DOCX, PNG, JPEG up to 10MB
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {selectedFile && (
+                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md">
+                        <div className="flex items-start space-x-2 text-sm">
+                          <Target className="h-4 w-4 text-blue-500 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-blue-700 dark:text-blue-300">
+                              AI-Powered Field Detection
+                            </p>
+                            <p className="text-blue-600 dark:text-blue-400">
+                              Our system will automatically detect XXX markers and map field positions during upload.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {selectedFile && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      File size: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                    </p>
-                  )}
                 </div>
               </div>
               
@@ -368,7 +627,17 @@ export default function TemplateAdmin() {
                   disabled={isUploading || !createForm.name.trim() || !selectedFile}
                   data-testid="button-create-template"
                 >
-                  {isUploading ? "Creating..." : "Create Template"}
+                  {isUploading ? (
+                    <>
+                      <Zap className="h-4 w-4 mr-2 animate-pulse" />
+                      {isAnalyzing ? 'Analyzing Fields...' : 'Uploading...'}
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create & Analyze Template
+                    </>
+                  )}
                 </Button>
               </div>
             </DialogContent>
@@ -434,6 +703,218 @@ export default function TemplateAdmin() {
               </div>
             </DialogContent>
           </Dialog>
+          
+          {/* Field Detection Preview Modal */}
+          <Dialog open={isPreviewModalOpen} onOpenChange={setIsPreviewModalOpen}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="dialog-field-preview">
+              <DialogHeader>
+                <DialogTitle className="flex items-center space-x-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  <span>Field Detection Preview - {previewingTemplate?.name}</span>
+                </DialogTitle>
+                <DialogDescription>
+                  Analysis results and detected field mappings from automated template processing.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {previewingTemplate && (
+                <div className="space-y-6">
+                  {/* Template Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium flex items-center">
+                        <FileText className="h-4 w-4 mr-1 text-blue-500" />
+                        Template Details
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {previewingTemplate.description || 'No description'}
+                      </p>
+                      {previewingTemplate.isAutoCreated && (
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
+                          <Zap className="h-3 w-3 mr-1" />
+                          AI Generated
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium flex items-center">
+                        <Target className="h-4 w-4 mr-1 text-green-500" />
+                        Detection Results
+                      </p>
+                      {previewingTemplate.detectionMetadata?.confidence && (
+                        <p className="text-xs">
+                          Confidence: <span className="font-medium">{formatConfidence(previewingTemplate.detectionMetadata.confidence)}</span>
+                        </p>
+                      )}
+                      {previewingTemplate.detectionMetadata?.totalMarkersFound && (
+                        <p className="text-xs">
+                          Markers Found: <span className="font-medium">{previewingTemplate.detectionMetadata.totalMarkersFound}</span>
+                        </p>
+                      )}
+                      {previewingTemplate.detectionMetadata?.processingTime && (
+                        <p className="text-xs">
+                          Processing: <span className="font-medium">{previewingTemplate.detectionMetadata.processingTime}ms</span>
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium flex items-center">
+                        <BarChart3 className="h-4 w-4 mr-1 text-purple-500" />
+                        Field Statistics
+                      </p>
+                      <p className="text-xs">
+                        Total Fields: <span className="font-medium">{previewingTemplate.fieldMappings ? getFieldNamesFromMappings(previewingTemplate.fieldMappings).length : 0}</span>
+                      </p>
+                      <p className="text-xs">
+                        Created: <span className="font-medium">{previewingTemplate.createdAt ? formatDate(previewingTemplate.createdAt) : 'N/A'}</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* Field Mappings */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium flex items-center">
+                        <Target className="h-5 w-5 mr-2 text-primary" />
+                        Detected Field Mappings
+                      </h3>
+                      {previewingTemplate.filePath && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/public-objects/${previewingTemplate.filePath}`, '_blank')}
+                          data-testid="button-download-template"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          View Template
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {previewingTemplate.fieldMappings && Object.keys(previewingTemplate.fieldMappings).length > 0 ? (
+                      <div className="space-y-3">
+                        {Object.entries(previewingTemplate.fieldMappings).map(([fieldName, fieldData]) => (
+                          <Card key={fieldName} className="p-4" data-testid={`field-card-${fieldName}`}>
+                            <div className="space-y-3">
+                              {/* Field Header */}
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <h4 className="font-medium text-sm flex items-center">
+                                    <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-mono mr-2">
+                                      {fieldName}
+                                    </span>
+                                    <span>{fieldData.fieldDefinition?.label || fieldName}</span>
+                                  </h4>
+                                  {fieldData.fieldDefinition?.description && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {fieldData.fieldDefinition.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex space-x-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {fieldData.fieldDefinition?.type || 'text'}
+                                  </Badge>
+                                  {fieldData.detectionSummary?.averageConfidence && (
+                                    <Badge 
+                                      variant={getConfidenceBadgeColor(fieldData.detectionSummary.averageConfidence)}
+                                      className="text-xs"
+                                    >
+                                      {formatConfidence(fieldData.detectionSummary.averageConfidence)}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Field Instances */}
+                              {fieldData.instances && fieldData.instances.length > 0 && (
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    Field Instances ({fieldData.instances.length})
+                                  </p>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {fieldData.instances.map((instance, index) => (
+                                      <div key={index} className="bg-muted/30 p-2 rounded text-xs space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-medium">Instance {index + 1}</span>
+                                          {instance.detectionConfidence && (
+                                            <Badge variant="outline" className="text-xs px-1">
+                                              {formatConfidence(instance.detectionConfidence)}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <div className="space-y-0.5">
+                                          <p>Page: {instance.coordinates.page}</p>
+                                          <p>Position: x={Math.round(instance.coordinates.rect.x)}, y={Math.round(instance.coordinates.rect.y)}</p>
+                                          <p>Size: {Math.round(instance.coordinates.rect.width)} × {Math.round(instance.coordinates.rect.height)}</p>
+                                          {instance.ocrText && (
+                                            <p className="font-mono bg-background px-1 py-0.5 rounded truncate" title={instance.ocrText}>
+                                              OCR: "{instance.ocrText}"
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Detection Summary */}
+                              {fieldData.detectionSummary && (
+                                <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                                  <span>Method: {fieldData.detectionSummary.detectionMethod}</span>
+                                  <span>Found: {fieldData.detectionSummary.totalInstancesFound} instance(s)</span>
+                                  {fieldData.detectionSummary.conflictingInstances && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Conflicts Detected
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Target className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>No field mappings found for this template.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsPreviewModalOpen(false)}
+                  data-testid="button-close-preview"
+                >
+                  Close
+                </Button>
+                {previewingTemplate && previewingTemplate.fieldMappings && Object.keys(previewingTemplate.fieldMappings).length > 0 && (
+                  <Button
+                    onClick={() => {
+                      // Future: Open field editor
+                      toast({
+                        title: "Field Editor",
+                        description: "Field editing functionality coming soon!",
+                      });
+                    }}
+                    data-testid="button-edit-fields"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Fields
+                  </Button>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Templates Table */}
@@ -481,37 +962,94 @@ export default function TemplateAdmin() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Fields</TableHead>
+                      <TableHead>Template</TableHead>
+                      <TableHead>Fields & Analysis</TableHead>
+                      <TableHead>Detection</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {templates.map((template) => (
-                      <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center space-x-2">
-                            <FileText className="h-4 w-4 text-blue-500" />
-                            <span data-testid={`text-template-name-${template.id}`}>
-                              {template.name}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span 
-                            className="text-muted-foreground line-clamp-2" 
-                            data-testid={`text-template-description-${template.id}`}
-                          >
-                            {template.description || 'No description'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" data-testid={`badge-fields-count-${template.id}`}>
-                            {template.fieldMappings ? getFieldNamesFromMappings(template.fieldMappings).length : 0} fields
-                          </Badge>
-                        </TableCell>
+                    {templates.map((template) => {
+                      const fieldCount = template.fieldMappings ? getFieldNamesFromMappings(template.fieldMappings).length : 0;
+                      const isAutoCreated = template.isAutoCreated;
+                      const confidence = template.detectionMetadata?.confidence;
+                      const processingTime = template.detectionMetadata?.processingTime;
+                      
+                      return (
+                        <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
+                          <TableCell className="font-medium">
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4 text-blue-500" />
+                                <span data-testid={`text-template-name-${template.id}`}>
+                                  {template.name}
+                                </span>
+                                {isAutoCreated && (
+                                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
+                                    <Zap className="h-3 w-3 mr-1" />
+                                    AI Detected
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {template.description || 'No description'}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Badge 
+                                  variant={fieldCount > 0 ? "default" : "secondary"} 
+                                  data-testid={`badge-fields-count-${template.id}`}
+                                >
+                                  <Target className="h-3 w-3 mr-1" />
+                                  {fieldCount} fields
+                                </Badge>
+                                {fieldCount > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handlePreviewTemplate(template)}
+                                    className="text-xs h-6 px-2"
+                                    data-testid={`button-preview-fields-${template.id}`}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    Preview
+                                  </Button>
+                                )}
+                              </div>
+                              {processingTime && (
+                                <p className="text-xs text-muted-foreground flex items-center">
+                                  <BarChart3 className="h-3 w-3 mr-1" />
+                                  Analyzed in {processingTime}ms
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              {confidence !== undefined ? (
+                                <Badge 
+                                  variant={getConfidenceBadgeColor(confidence)}
+                                  className="text-xs"
+                                  data-testid={`badge-confidence-${template.id}`}
+                                >
+                                  {formatConfidence(confidence)} confidence
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">
+                                  Manual
+                                </Badge>
+                              )}
+                              {template.detectionMetadata?.totalMarkersFound && (
+                                <p className="text-xs text-muted-foreground">
+                                  {template.detectionMetadata.totalMarkersFound} markers found
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3" />
@@ -520,17 +1058,28 @@ export default function TemplateAdmin() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
-                              onClick={() => handleEditTemplate(template)}
-                              data-testid={`button-edit-${template.id}`}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-1">
+                              {fieldCount > 0 && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                                  onClick={() => handlePreviewTemplate(template)}
+                                  data-testid={`button-preview-${template.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                onClick={() => handleEditTemplate(template)}
+                                data-testid={`button-edit-${template.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button 
@@ -565,11 +1114,12 @@ export default function TemplateAdmin() {
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
-                          </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
