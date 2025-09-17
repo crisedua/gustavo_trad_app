@@ -30,7 +30,7 @@ ${templateFields ? `Focus on these specific template fields: ${templateFields.jo
 Return ONLY a JSON object with field names as keys and extracted values as strings. If a field cannot be found, omit it from the response.`;
 
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Extract structured data from this OCR text:\n\n${ocrText}` }
@@ -60,7 +60,7 @@ Create the best possible mapping between extracted data and template fields. Ret
 Only include mappings where you're confident about the match. If no good match exists for a template field, omit it.`;
 
       const response = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: "Create the field mapping." }
