@@ -262,41 +262,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract text using OCR
       let extractedText: string;
       try {
-        // For demo, we'll simulate OCR extraction
-        // In production, use: extractedText = await ocrService.extractTextFromFile(job.originalFilePath);
-        extractedText = `NATIONAL CIVIL REGISTRY
-DIGITAL CIVIL STATUS REGISTRATION
-Serial Indicator: CRT-2024-001234
-Registry Office Information
-Country: Colombia
-Department: Cundinamarca  
-Municipality: Bogotá
-Date of Registration: 15/03/2024
-Office Type: Principal Registry
-Office Name/Number: Bogotá Central Registry Office #1
-Marriage Information
-Country: Colombia
-Department: Cundinamarca
-Municipality: Bogotá
-Date of Registration: 15/03/2024
-Marriage Type: Civil Marriage
-Party to the Marriage — A
-Names: María Elena García
-Surnames: Rodríguez López
-Document Type: Cédula de Ciudadanía
-Document Number: 52.345.678
-Party to the Marriage — B  
-Names: Carlos Alberto
-Surnames: Mendoza Silva
-Document Type: Cédula de Ciudadanía
-Document Number: 80.123.456
-Date of Issue
-Day: 20
-Month: March
-Year: 2024
-Authorized Signature
-Name: Dr. Ana Patricia Jiménez
-Title: Civil Registry Officer`;
+        // Use real Google Vision OCR
+        extractedText = await ocrService.extractTextFromFile(job.originalFilePath);
+        console.log('OCR extraction successful, text length:', extractedText.length);
       } catch (error) {
         throw new Error(`OCR failed: ${error instanceof Error ? error.message : String(error)}`);
       }

@@ -4,9 +4,30 @@ export class OCRService {
   private client: ImageAnnotatorClient;
 
   constructor() {
+    // Try to use credentials from environment variables first
+    let credentials;
+    let projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      try {
+        credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+        projectId = credentials.project_id;
+      } catch (error) {
+        console.error('Failed to parse Google Cloud credentials JSON:', error);
+      }
+    }
+
+    // Fallback to your specific project configuration
+    if (!credentials && !projectId) {
+      projectId = 'traduccion-471914';
+      // For development, we'll create a basic configuration
+      // In production, make sure to set GOOGLE_APPLICATION_CREDENTIALS_JSON properly
+    }
+
     this.client = new ImageAnnotatorClient({
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+      ...(credentials && { credentials }),
+      ...(process.env.GOOGLE_APPLICATION_CREDENTIALS && { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS }),
+      projectId,
     });
   }
 
