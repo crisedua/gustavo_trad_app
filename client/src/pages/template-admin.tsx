@@ -14,15 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Plus, FileText, Trash2, Edit, Calendar, Upload, Settings, ArrowLeft, HelpCircle, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
-
-interface Template {
-  id: string;
-  name: string;
-  description: string;
-  filePath: string;
-  fields: string[];
-  createdAt: string;
-}
+import { Template, getFieldNamesFromMappings } from "@shared/schema";
 
 export default function TemplateAdmin() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -517,14 +509,14 @@ export default function TemplateAdmin() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" data-testid={`badge-fields-count-${template.id}`}>
-                            {template.fields.length} fields
+                            {template.fieldMappings ? getFieldNamesFromMappings(template.fieldMappings).length : 0} fields
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                             <Calendar className="h-3 w-3" />
                             <span data-testid={`text-template-date-${template.id}`}>
-                              {formatDate(template.createdAt)}
+                              {template.createdAt ? formatDate(template.createdAt) : 'N/A'}
                             </span>
                           </div>
                         </TableCell>

@@ -5,6 +5,8 @@ import OpenAI from "openai";
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as fs from 'fs';
 import * as path from 'path';
+import { PathValidator } from '../security/pathValidator';
+import { SSRFProtection } from '../security/ssrfProtection';
 import { 
   TemplateFieldMappings, 
   FieldMapping, 
@@ -179,27 +181,18 @@ export class TemplateAnalysisService {
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
         // Handle localhost URLs via filesystem, external URLs via download
         if (filePath.includes('localhost') || filePath.includes('127.0.0.1')) {
-          // Convert localhost URL to filesystem path
+          // Securely convert localhost URL to filesystem path
           const url = new URL(filePath);
-          let localPath = '';
+          console.log('TemplateAnalysis: Processing localhost URL securely:', url.pathname.substring(0, 50) + '...');
           
-          if (url.pathname.startsWith('/public-objects/')) {
-            // Map /public-objects/ to the actual filesystem directory
-            localPath = path.join(process.cwd(), 'public-objects', url.pathname.substring('/public-objects/'.length));
-          } else if (url.pathname.startsWith('/objects/')) {
-            // Map /objects/ to uploads directory 
-            localPath = path.join(process.cwd(), 'uploads', url.pathname.substring('/objects/'.length));
-          } else {
-            // Try direct file access in current directory
-            localPath = path.join(process.cwd(), url.pathname.substring(1));
-          }
+          // Use secure path validation to prevent traversal attacks
+          const localPath = PathValidator.mapLocalhostUrlToPath(url);
           
-          console.log('TemplateAnalysis: Mapped localhost URL to filesystem path:', localPath);
+          // Validate file exists and check size limits
+          PathValidator.validateFileExists(localPath);
+          PathValidator.validateFileSize(localPath, 10 * 1024 * 1024); // 10MB limit
           
-          // Check if file exists and read it
-          if (!fs.existsSync(localPath)) {
-            throw new Error(`File not found at filesystem path: ${localPath}`);
-          }
+          console.log('TemplateAnalysis: Validated filesystem path:', localPath.substring(localPath.lastIndexOf(path.sep) + 1));
           
           const fileBuffer = fs.readFileSync(localPath);
           const fileType = this.detectFileType(fileBuffer, filePath);
@@ -257,8 +250,8 @@ export class TemplateAnalysisService {
     try {
       console.log('Extracting PDF text with positions using PDF.js');
       
-      // Load PDF document
-      const doc = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+      // Load PDF document (convert Buffer to Uint8Array)
+      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer) }).promise;
       const results: any[] = [];
       
       // Process each page
@@ -762,15 +755,21 @@ Document excerpt: ${fullText.substring(0, 1000)}...`;
 
   /**
    * Convert HTTP/HTTPS URL to Google Storage URI
+   * Only convert actual GCS URLs, not localhost URLs
    */
   private convertToGsUri(url: string): string {
     if (url.startsWith('gs://')) {
       return url;
     }
     
-    // Simple conversion for Replit object storage URLs
-    if (url.includes('/objects/') || url.includes('/public-objects/')) {
-      // Extract the path after /objects/ or /public-objects/
+    // Don't convert localhost URLs - they should be handled via filesystem
+    if (url.includes('localhost') || url.includes('127.0.0.1')) {
+      return url;
+    }
+    
+    // Only convert actual GCS URLs, not localhost object storage URLs
+    if (url.includes('storage.googleapis.com') || url.includes('storage.cloud.google.com')) {
+      // Extract the path after /objects/ or /public-objects/ for GCS URLs only
       const match = url.match(/\/(objects|public-objects)\/(.+)$/);
       if (match) {
         const bucketName = process.env.GOOGLE_CLOUD_BUCKET_NAME || 'default-bucket';
@@ -783,32 +782,116 @@ Document excerpt: ${fullText.substring(0, 1000)}...`;
   }
 
   /**
-   * Download file from Google Storage or HTTP URL
+   * Download file from Google Storage, localhost URL, or HTTP URL
    */
   private async downloadFile(uri: string): Promise<Buffer> {
-    if (uri.startsWith('gs://')) {
-      // Download from Google Cloud Storage
-      const parts = uri.replace('gs://', '').split('/');
-      const bucketName = parts[0];
-      const fileName = parts.slice(1).join('/');
-      
-      const bucket = this.storage.bucket(bucketName);
-      const file = bucket.file(fileName);
-      
-      const [buffer] = await file.download();
-      return buffer;
-    } else if (uri.startsWith('http://') || uri.startsWith('https://')) {
-      // Download from HTTP URL
-      const response = await fetch(uri);
-      if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.statusText}`);
+    try {
+      if (uri.startsWith('gs://')) {
+        // Download from Google Cloud Storage (trusted internal source)
+        console.log('TemplateAnalysis downloadFile: Processing GCS URI:', uri.substring(0, 30) + '...');
+        const parts = uri.replace('gs://', '').split('/');
+        const bucketName = parts[0];
+        const fileName = parts.slice(1).join('/');
+        
+        const bucket = this.storage.bucket(bucketName);
+        const file = bucket.file(fileName);
+        
+        const [buffer] = await file.download();
+        console.log('TemplateAnalysis downloadFile: Downloaded GCS file successfully, size:', buffer.length, 'bytes');
+        return buffer;
+      } else if (uri.includes('localhost') || uri.includes('127.0.0.1')) {
+        // Handle localhost URLs by mapping to filesystem paths (development only)
+        console.log('TemplateAnalysis downloadFile: Processing localhost URL securely:', uri.substring(0, 50) + '...');
+        
+        const url = new URL(uri);
+        
+        // Use secure path validation to prevent traversal attacks
+        const localPath = PathValidator.mapLocalhostUrlToPath(url);
+        
+        // Validate file exists and check size limits
+        PathValidator.validateFileExists(localPath);
+        PathValidator.validateFileSize(localPath, 10 * 1024 * 1024); // 10MB limit
+        
+        const buffer = fs.readFileSync(localPath);
+        console.log('TemplateAnalysis downloadFile: Read localhost file securely, size:', buffer.length, 'bytes');
+        return buffer;
+      } else if (uri.startsWith('http://') || uri.startsWith('https://')) {
+        // Download from external HTTP URL with SSRF protection
+        console.log('TemplateAnalysis downloadFile: Processing external URL with SSRF protection:', uri.substring(0, 50) + '...');
+        
+        // Validate URL is safe for external requests
+        await SSRFProtection.validateUrl(uri);
+        
+        // Create secure request configuration
+        const requestConfig = SSRFProtection.createSecureRequestConfig(uri);
+        
+        // Make the request with timeout protection
+        const timeoutPromise = SSRFProtection.createTimeoutPromise(requestConfig.timeout);
+        
+        const fetchPromise = fetch(uri, {
+          method: 'GET',
+          headers: requestConfig.headers,
+          signal: AbortSignal.timeout(requestConfig.timeout)
+        });
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+        }
+        
+        // Validate response content type
+        const contentType = response.headers.get('content-type') || '';
+        SSRFProtection.validateContentType(contentType);
+        
+        // Validate response size
+        const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+        if (contentLength > 0) {
+          SSRFProtection.validateResponseSize(contentLength);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        // Final size check after download
+        SSRFProtection.validateResponseSize(buffer.length);
+        
+        console.log('TemplateAnalysis downloadFile: Downloaded external file securely, size:', buffer.length, 'bytes');
+        return buffer;
+      } else {
+        // Local file path - validate it's safe
+        console.log('TemplateAnalysis downloadFile: Processing local file path:', uri.substring(0, 50) + '...');
+        
+        // Ensure local paths are within allowed directories
+        const resolvedPath = path.resolve(uri);
+        const allowedRoots = [
+          path.resolve(process.cwd(), 'uploads'),
+          path.resolve(process.cwd(), 'public-objects'),
+          path.resolve(process.cwd(), 'attached_assets')
+        ];
+        
+        const isPathAllowed = allowedRoots.some(root => 
+          resolvedPath.startsWith(root + path.sep) || resolvedPath === root
+        );
+        
+        if (!isPathAllowed) {
+          throw new Error(`Access denied: Local file path outside allowed directories: ${uri}`);
+        }
+        
+        // Validate file exists and size
+        PathValidator.validateFileExists(resolvedPath);
+        PathValidator.validateFileSize(resolvedPath, 10 * 1024 * 1024); // 10MB limit
+        
+        const buffer = fs.readFileSync(resolvedPath);
+        console.log('TemplateAnalysis downloadFile: Read local file securely, size:', buffer.length, 'bytes');
+        return buffer;
       }
-      const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer);
-    } else {
-      // Local file path
-      const fs = await import('fs');
-      return fs.readFileSync(uri);
+    } catch (error) {
+      console.error('TemplateAnalysis downloadFile failed:', error);
+      if (error instanceof Error) {
+        throw new Error(`Secure file download failed: ${error.message}`);
+      }
+      throw new Error(`Secure file download failed: ${String(error)}`);
     }
   }
 
