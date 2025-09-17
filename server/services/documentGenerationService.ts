@@ -1,12 +1,22 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import * as fs from 'fs';
+import * as path from 'path';
 
 export class DocumentGenerationService {
   
   async fillPDFTemplate(templatePath: string, fieldMappings: Record<string, string>): Promise<Buffer> {
     try {
+      // Resolve the template path - if it starts with '/' but isn't a system path, treat it as relative
+      let resolvedPath = templatePath;
+      if (templatePath.startsWith('/') && !templatePath.startsWith('/home') && !templatePath.startsWith('/usr')) {
+        // Remove leading slash and resolve from project root
+        resolvedPath = path.join(process.cwd(), templatePath.substring(1));
+      }
+      
+      console.log(`Reading template from: ${resolvedPath}`);
+      
       // Read the template file
-      const templateBytes = fs.readFileSync(templatePath);
+      const templateBytes = fs.readFileSync(resolvedPath);
       
       // Load the PDF
       const pdfDoc = await PDFDocument.load(templateBytes);
