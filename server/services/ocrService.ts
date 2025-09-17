@@ -2,6 +2,8 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { Storage } from '@google-cloud/storage';
 import { objectStorageClient } from '../objectStorage';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export class OCRService {
   private client: ImageAnnotatorClient;
@@ -64,15 +66,47 @@ export class OCRService {
     try {
       console.log('Processing file for OCR:', filePath.substring(0, 50) + '...');
       
-      // Check if filePath is a URL (signed URL from Google Cloud Storage)
+      // Check if filePath is a URL (signed URL from Google Cloud Storage or localhost)
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-        // Convert to gs:// format
-        const gsUri = this.convertToGsUri(filePath);
-        console.log('Converted to gs:// URI:', gsUri.substring(0, 30) + '...');
+        let fileBuffer: Buffer;
         
-        // Download file with fallback authentication
-        const fileBuffer = await this.downloadWithFallback(gsUri);
-        console.log('Downloaded file successfully, size:', fileBuffer.length, 'bytes');
+        // Handle localhost URLs by mapping to filesystem paths
+        if (filePath.includes('localhost') || filePath.includes('127.0.0.1')) {
+          console.log('Processing localhost URL via filesystem:', filePath.substring(0, 50) + '...');
+          
+          // Convert localhost URL to filesystem path
+          const url = new URL(filePath);
+          let localPath = '';
+          
+          if (url.pathname.startsWith('/public-objects/')) {
+            // Map /public-objects/ to the actual filesystem directory
+            localPath = path.join(process.cwd(), 'public-objects', url.pathname.substring('/public-objects/'.length));
+          } else if (url.pathname.startsWith('/objects/')) {
+            // Map /objects/ to uploads directory 
+            localPath = path.join(process.cwd(), 'uploads', url.pathname.substring('/objects/'.length));
+          } else {
+            // Try direct file access in current directory
+            localPath = path.join(process.cwd(), url.pathname.substring(1));
+          }
+          
+          console.log('Mapped localhost URL to filesystem path:', localPath);
+          
+          // Check if file exists and read it
+          if (!fs.existsSync(localPath)) {
+            throw new Error(`File not found at filesystem path: ${localPath}`);
+          }
+          
+          fileBuffer = fs.readFileSync(localPath);
+          console.log('Read localhost file successfully from filesystem, size:', fileBuffer.length, 'bytes');
+        } else {
+          // Convert to gs:// format for Google Cloud Storage URLs
+          const gsUri = this.convertToGsUri(filePath);
+          console.log('Converted to gs:// URI:', gsUri.substring(0, 30) + '...');
+          
+          // Download file with fallback authentication
+          fileBuffer = await this.downloadWithFallback(gsUri);
+          console.log('Downloaded file successfully, size:', fileBuffer.length, 'bytes');
+        }
         
         // Detect file type from buffer
         const fileType = this.detectFileType(fileBuffer, filePath);

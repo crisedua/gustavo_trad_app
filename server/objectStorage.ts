@@ -1,6 +1,8 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -76,6 +78,37 @@ export class ObjectStorageService {
 
   // Search for a public object from the search paths.
   async searchPublicObject(filePath: string): Promise<File | null> {
+    // For local development, check filesystem first
+    if (process.env.NODE_ENV === 'development') {
+      const localPath = path.join(process.cwd(), 'public-objects', filePath);
+      if (fs.existsSync(localPath)) {
+        // Create a pseudo-File object for local filesystem files
+        return {
+          name: filePath,
+          bucket: { name: 'local-filesystem' },
+          createReadStream: () => fs.createReadStream(localPath),
+          getMetadata: async () => {
+            const stats = fs.statSync(localPath);
+            let contentType = 'application/octet-stream';
+            const ext = path.extname(localPath).toLowerCase();
+            if (ext === '.pdf') contentType = 'application/pdf';
+            else if (ext === '.png') contentType = 'image/png';
+            else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+            else if (ext === '.gif') contentType = 'image/gif';
+            
+            return [{
+              contentType,
+              size: stats.size.toString(),
+              timeCreated: stats.birthtime.toISOString(),
+              updated: stats.mtime.toISOString()
+            }];
+          },
+          exists: async () => [fs.existsSync(localPath)]
+        } as any;
+      }
+    }
+
+    // Fallback to GCS for production or if local file not found
     for (const searchPath of this.getPublicObjectSearchPaths()) {
       const fullPath = `${searchPath}/${filePath}`;
 
@@ -99,9 +132,17 @@ export class ObjectStorageService {
     try {
       // Get file metadata
       const [metadata] = await file.getMetadata();
-      // Get the ACL policy for the object.
-      const aclPolicy = await getObjectAclPolicy(file);
-      const isPublic = aclPolicy?.visibility === "public";
+      
+      // Check if this is a local filesystem file (our pseudo-File object)
+      const isLocalFile = (file as any).bucket?.name === 'local-filesystem';
+      
+      let isPublic = true; // Default for local files
+      if (!isLocalFile) {
+        // Get the ACL policy for GCS objects only
+        const aclPolicy = await getObjectAclPolicy(file);
+        isPublic = aclPolicy?.visibility === "public";
+      }
+      
       // Set appropriate headers
       res.set({
         "Content-Type": metadata.contentType || "application/octet-stream",

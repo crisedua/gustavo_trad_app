@@ -6,6 +6,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { OCRService } from "./services/ocrService";
 import { FieldExtractionService } from "./services/fieldExtractionService";
 import { DocumentGenerationService } from "./services/documentGenerationService";
+import { TemplateAnalysisService } from "./services/templateAnalysisService";
 import multer from "multer";
 import * as fs from "fs";
 import * as path from "path";
@@ -19,6 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const ocrService = new OCRService();
   const fieldExtractionService = new FieldExtractionService();
   const documentGenerationService = new DocumentGenerationService();
+  const templateAnalysisService = new TemplateAnalysisService();
 
   // Serve public objects (templates, etc.)
   app.get("/public-objects/:filePath(*)", async (req, res) => {
@@ -71,6 +73,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Utility function to convert legacy fields array to new fieldMappings structure
+  function convertLegacyFieldsToMappings(legacyFields: any[]): any {
+    const fieldMappings: any = {};
+    
+    legacyFields.forEach((field, index) => {
+      const fieldName = field.name || `field_${index}`;
+      fieldMappings[fieldName] = {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: {
+              x: field.x || 0,
+              y: field.y || 0,
+              width: field.width || 100,
+              height: field.height || 20
+            },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.8
+        }],
+        fieldDefinition: {
+          type: field.type || 'text',
+          label: field.label || field.name || `Field ${index + 1}`,
+          description: field.description,
+          validation: field.validation || {},
+          displayOptions: field.displayOptions || {}
+        },
+        detectionSummary: {
+          totalInstancesFound: 1,
+          averageConfidence: 0.8,
+          detectionMethod: 'legacy_conversion'
+        }
+      };
+    });
+    
+    return fieldMappings;
+  }
+
   app.post("/api/templates", upload.single('templateFile'), async (req, res) => {
     try {
       const { name, description, fields } = req.body;
@@ -84,12 +125,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Template name is required" });
       }
 
-      // Parse fields if provided as string
-      let parsedFields;
-      try {
-        parsedFields = fields ? JSON.parse(fields) : [];
-      } catch (error) {
-        return res.status(400).json({ error: "Invalid fields format" });
+      // Parse fields if provided as string (legacy format)
+      // Convert to new fieldMappings format or provide empty structure
+      let fieldMappings = {};
+      if (fields) {
+        try {
+          const parsedFields = JSON.parse(fields);
+          // Convert legacy fields array to new fieldMappings structure
+          if (Array.isArray(parsedFields)) {
+            fieldMappings = convertLegacyFieldsToMappings(parsedFields);
+          } else {
+            fieldMappings = parsedFields; // Assume it's already in the correct format
+          }
+        } catch (error) {
+          return res.status(400).json({ error: "Invalid fields format" });
+        }
       }
 
       // TODO: Upload template file to object storage
@@ -100,7 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         description: description || null,
         filePath: templatePath,
-        fields: parsedFields
+        fieldMappings
       });
 
       const template = await storage.createTemplate(templateData);
@@ -192,6 +242,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting template:", error);
       res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  // Template Analysis API - Analyze document for markers and field positions
+  app.post("/api/templates/analyze", async (req, res) => {
+    try {
+      const { filePath } = req.body;
+
+      if (!filePath) {
+        return res.status(400).json({ error: "filePath is required" });
+      }
+
+      console.log('Starting template analysis for:', filePath);
+
+      // Analyze the template using the new service
+      const analysisResult = await templateAnalysisService.analyzeTemplate(filePath);
+
+      res.json({
+        success: true,
+        analysis: analysisResult,
+        message: `Analysis completed: found ${analysisResult.analysisReport.fieldsIdentified} fields from ${analysisResult.analysisReport.totalMarkersFound} markers`
+      });
+
+    } catch (error) {
+      console.error("Error analyzing template:", error);
+      res.status(500).json({ 
+        error: "Template analysis failed", 
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Auto-create template from analysis results
+  app.post("/api/templates/auto-create", async (req, res) => {
+    try {
+      const { filePath, templateName, description } = req.body;
+
+      if (!filePath) {
+        return res.status(400).json({ error: "filePath is required" });
+      }
+
+      if (!templateName) {
+        return res.status(400).json({ error: "templateName is required" });
+      }
+
+      console.log('Creating automated template:', templateName);
+
+      // Create automated template
+      const autoTemplate = await templateAnalysisService.createAutomatedTemplate(
+        filePath, 
+        templateName, 
+        description
+      );
+
+      // Save the template to storage
+      const templateData = insertTemplateSchema.parse({
+        name: autoTemplate.templateName,
+        description: autoTemplate.templateDescription || null,
+        filePath: autoTemplate.sourceDocumentPath,
+        isAutoCreated: true,
+        sourceDocumentPath: autoTemplate.sourceDocumentPath,
+        templateType: autoTemplate.templateType,
+        detectionMetadata: autoTemplate.detectionMetadata,
+        fieldMappings: autoTemplate.fieldMappings,
+        validationRules: null // Will be added later if needed
+      });
+
+      const template = await storage.createTemplate(templateData);
+
+      res.status(201).json({
+        success: true,
+        template,
+        analysisResults: {
+          fieldsDetected: Object.keys(autoTemplate.fieldMappings).length,
+          documentType: autoTemplate.templateType,
+          confidence: autoTemplate.detectionMetadata?.confidence || 0
+        },
+        message: `Template created successfully with ${Object.keys(autoTemplate.fieldMappings).length} detected fields`
+      });
+
+    } catch (error) {
+      console.error("Error creating automated template:", error);
+      res.status(500).json({ 
+        error: "Failed to create automated template", 
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
