@@ -243,7 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update job with error
       await storage.updateProcessingJob(req.params.id, {
         status: 'error',
-        errorMessage: error.message
+        errorMessage: error instanceof Error ? error.message : String(error)
       });
       
       res.status(500).json({ error: "Failed to generate document" });
@@ -298,7 +298,7 @@ Authorized Signature
 Name: Dr. Ana Patricia Jiménez
 Title: Civil Registry Officer`;
       } catch (error) {
-        throw new Error(`OCR failed: ${error.message}`);
+        throw new Error(`OCR failed: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       // Update status to extraction
@@ -312,7 +312,7 @@ Title: Civil Registry Officer`;
         
         extractedData = await fieldExtractionService.extractFields(extractedText, templateFields);
       } catch (error) {
-        throw new Error(`Field extraction failed: ${error.message}`);
+        throw new Error(`Field extraction failed: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       // Update status to mapping
@@ -350,7 +350,7 @@ Title: Civil Registry Officer`;
       console.error(`Processing job ${jobId} failed:`, error);
       await storage.updateProcessingJob(jobId, {
         status: 'error',
-        errorMessage: error.message
+        errorMessage: error instanceof Error ? error.message : String(error)
       });
     }
   }

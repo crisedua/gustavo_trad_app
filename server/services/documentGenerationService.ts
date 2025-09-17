@@ -26,7 +26,7 @@ export class DocumentGenerationService {
           }
         } catch (error) {
           // Field might not exist or might be different type, continue
-          console.warn(`Could not fill field ${templateField}:`, error.message);
+          console.warn(`Could not fill field ${templateField}:`, error instanceof Error ? error.message : String(error));
         }
       }
 
@@ -43,7 +43,7 @@ export class DocumentGenerationService {
       return Buffer.from(filledPdfBytes);
     } catch (error) {
       console.error('PDF template filling failed:', error);
-      throw new Error(`PDF generation failed: ${error.message}`);
+      throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

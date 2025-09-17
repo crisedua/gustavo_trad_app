@@ -60,7 +60,7 @@ export class MemStorage implements IStorage {
         "issue_year",
         "authorized_name",
         "authorized_title"
-      ],
+      ] as string[],
       createdAt: new Date(),
     };
     this.templates.set(defaultTemplate.id, defaultTemplate);
@@ -90,6 +90,7 @@ export class MemStorage implements IStorage {
     const template: Template = { 
       ...insertTemplate, 
       id,
+      description: insertTemplate.description ?? null,
       createdAt: new Date()
     };
     this.templates.set(id, template);
@@ -123,9 +124,11 @@ export class MemStorage implements IStorage {
     const job: ProcessingJob = {
       ...insertJob,
       id,
+      extractedData: insertJob.extractedData ?? null,
+      templateId: insertJob.templateId ?? null,
+      fieldMappings: insertJob.fieldMappings ?? null,
       errorMessage: null,
       generatedDocumentPath: null,
-      fieldMappings: null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
