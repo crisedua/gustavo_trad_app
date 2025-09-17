@@ -133,16 +133,32 @@ export class OCRService {
         }
       }
       
-      // For local file paths, process directly
-      const [result] = await this.client.textDetection(filePath);
-      const detections = result.textAnnotations;
+      // For local file paths, read file as buffer and process
+      console.log('Processing local file path:', filePath);
       
-      if (!detections || detections.length === 0) {
-        throw new Error('No text detected in the document');
+      // Validate file exists and get file buffer
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File not found: ${filePath}`);
       }
-
-      // The first detection contains the entire text
-      return detections[0].description || '';
+      
+      const fileBuffer = fs.readFileSync(filePath);
+      const fileType = this.detectFileType(fileBuffer, filePath);
+      console.log('Detected file type for local file:', fileType);
+      
+      if (fileType === 'pdf') {
+        // Process PDF using PDF-to-image conversion 
+        return await this.extractTextFromPDFBuffer(fileBuffer);
+      } else if (fileType === 'tiff') {
+        // Process TIFF as image using direct buffer approach
+        return await this.extractTextFromImageBuffer(fileBuffer);
+      } else if (fileType === 'docx') {
+        // For DOCX files, we need to convert them to images first
+        // For now, inform user that DOCX needs to be converted to PDF
+        throw new Error('DOCX files are not supported directly. Please convert to PDF format first.');
+      } else {
+        // Process as image using buffer
+        return await this.extractTextFromImageBuffer(fileBuffer);
+      }
     } catch (error) {
       console.error('OCR extraction failed:', error);
       throw new Error(`OCR processing failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -166,7 +182,7 @@ export class OCRService {
     }
   }
 
-  private detectFileType(buffer: Buffer, filePath: string): 'pdf' | 'tiff' | 'image' {
+  private detectFileType(buffer: Buffer, filePath: string): 'pdf' | 'tiff' | 'image' | 'docx' {
     // Check PDF header
     if (buffer.length >= 4 && buffer.subarray(0, 4).toString() === '%PDF') {
       return 'pdf';
@@ -181,17 +197,26 @@ export class OCRService {
       }
     }
     
+    // Check ZIP/DOCX header (PK signature - 0x50, 0x4B)
+    if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B) {
+      // Check if it's likely a DOCX by extension or content
+      if (filePath.toLowerCase().includes('.docx') || filePath.toLowerCase().includes('.doc')) {
+        return 'docx';
+      }
+    }
+    
     // Check file extension as fallback
     return this.detectFileTypeFromPath(filePath);
   }
   
-  private detectFileTypeFromPath(filePath: string): 'pdf' | 'tiff' | 'image' {
+  private detectFileTypeFromPath(filePath: string): 'pdf' | 'tiff' | 'image' | 'docx' {
     // Extract extension, handling URLs with query parameters
     const pathWithoutQuery = filePath.split('?')[0];
     const extension = pathWithoutQuery.toLowerCase().split('.').pop() || '';
     
     if (extension === 'pdf') return 'pdf';
     if (['tiff', 'tif'].includes(extension)) return 'tiff';
+    if (['docx', 'doc'].includes(extension)) return 'docx';
     return 'image';
   }
   
@@ -375,10 +400,10 @@ export class OCRService {
 
   private async extractTextFromPDFBuffer(fileBuffer: Buffer): Promise<string> {
     try {
-      console.log('Processing PDF using direct text extraction...');
+      console.log('Processing PDF using direct text extraction..., file size:', fileBuffer.length);
       
       // Load the PDF document from buffer (convert Buffer to Uint8Array)
-      const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileBuffer));
+      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) });
       const pdfDocument = await loadingTask.promise;
       
       console.log(`PDF loaded with ${pdfDocument.numPages} pages`);
@@ -398,10 +423,19 @@ export class OCRService {
           
           // Extract text content directly from PDF
           const textContent = await page.getTextContent();
+          console.log(`Page ${pageNum} has ${textContent.items.length} text items`);
           
-          // Combine all text items from the page
+          // Combine all text items from the page with proper spacing
           const pageText = textContent.items
-            .map((item: any) => item.str)
+            .map((item: any) => {
+              // Each item has str (text) and transform (positioning)
+              const text = item.str;
+              if (text.trim()) {
+                return text;
+              }
+              return '';
+            })
+            .filter(text => text.length > 0)
             .join(' ')
             .trim();
           
@@ -411,6 +445,7 @@ export class OCRService {
               combinedText += '\n';
             }
             console.log(`✅ Page ${pageNum} processed, extracted ${pageText.length} characters`);
+            console.log(`First 100 chars of page ${pageNum}:`, pageText.substring(0, 100));
           } else {
             console.log(`⚠️ Page ${pageNum} contained no text`);
           }
@@ -421,15 +456,26 @@ export class OCRService {
       }
       
       if (!combinedText.trim()) {
-        throw new Error('No text detected in any PDF pages');
+        console.error('No text extracted from PDF - this might be an image-based PDF');
+        // Fallback to Vision API for image-based PDFs
+        console.log('Falling back to Vision API for image-based PDF...');
+        return await this.extractTextFromImageBuffer(fileBuffer);
       }
       
       console.log(`✅ Successfully extracted text from PDF (${pdfDocument.numPages} pages), total length:`, combinedText.length);
+      console.log('First 200 chars of extracted text:', combinedText.substring(0, 200));
       return combinedText.trim();
       
     } catch (error) {
       console.error('PDF processing failed:', error);
-      throw new Error(`PDF processing failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.log('Attempting fallback to Vision API...');
+      // Fallback to Vision API if PDF processing fails
+      try {
+        return await this.extractTextFromImageBuffer(fileBuffer);
+      } catch (fallbackError) {
+        console.error('Vision API fallback also failed:', fallbackError);
+        throw new Error(`PDF processing failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 

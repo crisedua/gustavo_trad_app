@@ -112,6 +112,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return fieldMappings;
   }
 
+  // Helper function to validate file types
+  function validateFileType(file: Express.Multer.File): { valid: boolean; error?: string } {
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/tiff',
+      'image/bmp'
+    ];
+    
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.tiff', '.tif', '.bmp'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return { 
+        valid: false, 
+        error: `Unsupported file type: ${file.mimetype}. Supported types: PDF, PNG, JPEG, GIF, TIFF, BMP` 
+      };
+    }
+    
+    if (!allowedExtensions.includes(fileExtension)) {
+      return { 
+        valid: false, 
+        error: `Unsupported file extension: ${fileExtension}. Supported extensions: ${allowedExtensions.join(', ')}` 
+      };
+    }
+    
+    return { valid: true };
+  }
+
+  // Helper function to sanitize detection metadata for API response
+  function sanitizeDetectionMetadata(metadata: any): any {
+    if (!metadata) return metadata;
+    
+    const sanitized = { ...metadata };
+    // Remove potentially sensitive file paths
+    delete sanitized.sourceFilePath;
+    
+    // Keep only safe metadata for API response
+    return {
+      autoDetected: sanitized.autoDetected,
+      analysisTimestamp: sanitized.analysisTimestamp,
+      originalFilename: sanitized.originalFilename,
+      analysisError: sanitized.analysisError,
+      manualConfiguration: sanitized.manualConfiguration,
+      // Include detection stats but not file paths
+      detectionMethod: sanitized.detectionMethod,
+      confidence: sanitized.confidence,
+      totalMarkersFound: sanitized.totalMarkersFound,
+      processingTime: sanitized.processingTime,
+      ocrAccuracy: sanitized.ocrAccuracy
+    };
+  }
+
   app.post("/api/templates", upload.single('templateFile'), async (req, res) => {
     try {
       const { name, description, fields, autoAnalyze = 'true' } = req.body;
@@ -123,6 +179,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!name) {
         return res.status(400).json({ error: "Template name is required" });
+      }
+
+      // Validate file type
+      const fileValidation = validateFileType(templateFile);
+      if (!fileValidation.valid) {
+        // Clean up the temp file
+        try {
+          fs.unlinkSync(templateFile.path);
+        } catch (cleanupError) {
+          console.warn('Failed to clean up temp file:', templateFile.path);
+        }
+        return res.status(400).json({ error: fileValidation.error });
       }
 
       // Parse fields if provided as string (legacy format)
@@ -197,29 +265,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
 
-      // TODO: Upload template file to object storage
-      // For now, store locally 
-      const templatePath = `/templates/${templateFile.filename}`;
+      // CRITICAL FIX: Move uploaded file to proper storage location
+      // Generate a safe filename with extension preservation
+      const fileExtension = path.extname(templateFile.originalname);
+      const safeFileName = `${templateFile.filename}${fileExtension}`;
+      const publicTemplateDir = path.join(process.cwd(), 'public-objects', 'templates');
+      const destinationPath = path.join(publicTemplateDir, safeFileName);
+      
+      // Ensure the templates directory exists
+      if (!fs.existsSync(publicTemplateDir)) {
+        fs.mkdirSync(publicTemplateDir, { recursive: true });
+      }
+      
+      try {
+        // Move file from uploads/ to public-objects/templates/
+        fs.renameSync(templateFile.path, destinationPath);
+        console.log(`✅ Template file moved from ${templateFile.path} to ${destinationPath}`);
+      } catch (moveError) {
+        console.error('Failed to move template file:', moveError);
+        // Clean up temp file if move failed
+        try {
+          fs.unlinkSync(templateFile.path);
+        } catch (cleanupError) {
+          console.warn('Failed to clean up temp file after move failure:', templateFile.path);
+        }
+        return res.status(500).json({ error: "Failed to store template file" });
+      }
+
+      // Set template path to match actual file location for document generation
+      const templatePath = `public-objects/templates/${safeFileName}`;
+
+      // Sanitize detection metadata before storing and responding
+      const sanitizedDetectionMetadata = sanitizeDetectionMetadata(detectionMetadata);
 
       const templateData = insertTemplateSchema.parse({
         name,
         description: description || null,
         filePath: templatePath,
         fieldMappings,
-        detectionMetadata
+        detectionMetadata: sanitizedDetectionMetadata
       });
 
       const template = await storage.createTemplate(templateData);
       
-      // Include analysis results in response for frontend feedback
+      // Include analysis results in response for frontend feedback (with sanitized data)
       const response = {
         ...template,
+        // Ensure detection metadata in response is also sanitized
+        detectionMetadata: sanitizedDetectionMetadata,
         autoAnalysisPerformed: shouldAutoAnalyze,
         ...(shouldAutoAnalyze && {
           analysisResults: {
             fieldsDetected: Object.keys(fieldMappings).length,
-            analysisSuccessful: !(detectionMetadata as any).analysisError,
-            processingTime: (detectionMetadata as any).processingTime || 0
+            analysisSuccessful: !(sanitizedDetectionMetadata as any).analysisError,
+            processingTime: (sanitizedDetectionMetadata as any).processingTime || 0
           }
         })
       };
@@ -227,6 +326,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(response);
     } catch (error) {
       console.error("Error creating template:", error);
+      
+      // Clean up any files if template creation failed after file was moved
+      if (req.file) {
+        const fileExtension = path.extname(req.file.originalname);
+        const safeFileName = `${req.file.filename}${fileExtension}`;
+        const publicTemplateDir = path.join(process.cwd(), 'public-objects', 'templates');
+        const destinationPath = path.join(publicTemplateDir, safeFileName);
+        
+        try {
+          if (fs.existsSync(destinationPath)) {
+            fs.unlinkSync(destinationPath);
+            console.log('✅ Cleaned up template file after failed creation:', destinationPath);
+          }
+        } catch (cleanupError) {
+          console.warn('Failed to clean up template file after failed creation:', cleanupError);
+        }
+        
+        // Also clean up original temp file if it still exists
+        try {
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+            console.log('✅ Cleaned up temp file after failed creation:', req.file.path);
+          }
+        } catch (cleanupError) {
+          console.warn('Failed to clean up temp file after failed creation:', cleanupError);
+        }
+      }
+      
       res.status(500).json({ error: "Failed to create template" });
     }
   });
@@ -304,9 +431,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Failed to delete template" });
       }
 
-      // TODO: Clean up template file from object storage
-      // For now, just log the file path that should be cleaned up
-      console.log(`Template deleted, should clean up file: ${template.filePath}`);
+      // Clean up template file from storage
+      try {
+        const templateFilePath = path.join(process.cwd(), 'public-objects', template.filePath);
+        if (fs.existsSync(templateFilePath)) {
+          fs.unlinkSync(templateFilePath);
+          console.log(`✅ Template file deleted: ${templateFilePath}`);
+        } else {
+          console.warn(`⚠️ Template file not found for cleanup: ${templateFilePath}`);
+        }
+      } catch (fileCleanupError) {
+        console.error('Failed to clean up template file:', fileCleanupError);
+        // Don't fail the deletion if file cleanup fails
+      }
 
       res.json({ success: true, message: "Template deleted successfully" });
     } catch (error) {
