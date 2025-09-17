@@ -1,5 +1,6 @@
 import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { Storage } from '@google-cloud/storage';
+import { objectStorageClient } from '../objectStorage';
 
 export class OCRService {
   private client: ImageAnnotatorClient;
@@ -64,19 +65,12 @@ export class OCRService {
       
       // Check if filePath is a URL (signed URL from Google Cloud Storage)
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-        // Convert to gs:// format and access using Storage client
+        // Convert to gs:// format
         const gsUri = this.convertToGsUri(filePath);
         console.log('Converted to gs:// URI:', gsUri.substring(0, 30) + '...');
         
-        // Download file using Storage client
-        const bucketName = gsUri.split('/')[2];
-        const objectName = gsUri.split('/').slice(3).join('/');
-        
-        const bucket = this.storage.bucket(bucketName);
-        const file = bucket.file(objectName);
-        
-        // Download file content
-        const [fileBuffer] = await file.download();
+        // Download file with fallback authentication
+        const fileBuffer = await this.downloadWithFallback(gsUri);
         console.log('Downloaded file successfully, size:', fileBuffer.length, 'bytes');
         
         // Detect file type from buffer
@@ -84,25 +78,30 @@ export class OCRService {
         console.log('Detected file type:', fileType);
         
         if (fileType === 'pdf' || fileType === 'tiff') {
-          // Process document using gs:// URI directly
+          // Process document using buffer (requires special handling)
           const mimeType = fileType === 'pdf' ? 'application/pdf' : 'image/tiff';
-          return await this.extractTextFromDocument(gsUri, mimeType);
+          return await this.extractTextFromDocumentBuffer(fileBuffer, mimeType, gsUri);
         } else {
-          // Process as image using the downloaded buffer
+          // Process as image using buffer
           return await this.extractTextFromBuffer(fileBuffer);
         }
       }
       
-      // For gs:// URIs, detect type and process accordingly
+      // For gs:// URIs, download and process as buffer to avoid permission issues
       if (filePath.startsWith('gs://')) {
-        const fileType = this.detectFileTypeFromPath(filePath);
+        const fileBuffer = await this.downloadWithFallback(filePath);
+        const fileType = this.detectFileType(fileBuffer, filePath);
+        console.log('Detected file type for gs:// URI:', fileType);
+        
         if (fileType === 'pdf' || fileType === 'tiff') {
           const mimeType = fileType === 'pdf' ? 'application/pdf' : 'image/tiff';
-          return await this.extractTextFromDocument(filePath, mimeType);
+          return await this.extractTextFromDocumentBuffer(fileBuffer, mimeType, filePath);
+        } else {
+          return await this.extractTextFromBuffer(fileBuffer);
         }
       }
       
-      // For local file paths or image gs:// URIs, use direct image detection
+      // For local file paths, process directly
       const [result] = await this.client.textDetection(filePath);
       const detections = result.textAnnotations;
       
@@ -300,6 +299,151 @@ export class OCRService {
       }
       
       console.log(`Successfully extracted text from ${docType}, length:`, extractedText.length);
+      return extractedText.trim();
+      
+    } catch (error) {
+      console.error(`${mimeType} processing failed:`, error);
+      throw new Error(`Document processing failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async downloadWithFallback(gsUri: string): Promise<Buffer> {
+    console.log('Attempting to download file with fallback authentication:', gsUri.substring(0, 30) + '...');
+    
+    const bucketName = gsUri.split('/')[2];
+    const objectName = gsUri.split('/').slice(3).join('/');
+    
+    // Try user credentials first
+    try {
+      console.log('Trying download with user credentials...');
+      const bucket = this.storage.bucket(bucketName);
+      const file = bucket.file(objectName);
+      const [fileBuffer] = await file.download();
+      console.log('✅ Download successful with user credentials');
+      return fileBuffer;
+    } catch (userError) {
+      console.log('❌ User credentials failed:', userError instanceof Error ? userError.message : String(userError));
+      
+      // Fallback to Replit's storage client
+      try {
+        console.log('Trying download with Replit storage client...');
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
+        const [fileBuffer] = await file.download();
+        console.log('✅ Download successful with Replit credentials');
+        return fileBuffer;
+      } catch (replitError) {
+        console.error('❌ Both credential methods failed');
+        console.error('User credentials error:', userError instanceof Error ? userError.message : String(userError));
+        console.error('Replit credentials error:', replitError instanceof Error ? replitError.message : String(replitError));
+        throw new Error(`Failed to download file from ${bucketName}: Both authentication methods failed. User error: ${userError instanceof Error ? userError.message : String(userError)}. Replit error: ${replitError instanceof Error ? replitError.message : String(replitError)}`);
+      }
+    }
+  }
+
+  private async extractTextFromDocumentBuffer(fileBuffer: Buffer, mimeType: string, originalGsUri: string): Promise<string> {
+    try {
+      const docType = mimeType === 'application/pdf' ? 'PDF' : 'TIFF';
+      console.log(`Processing ${docType} from buffer using temp bucket approach...`);
+      
+      // Check for temp bucket configuration
+      const tempBucket = process.env.OCR_TEMP_BUCKET;
+      if (!tempBucket) {
+        throw new Error(`${docType} processing requires OCR_TEMP_BUCKET environment variable. Please set this to a Google Cloud Storage bucket name that your service account can access.`);
+      }
+      
+      console.log('Using temp bucket:', tempBucket);
+      
+      // Upload buffer to temporary location in user's bucket
+      const timestamp = Date.now();
+      const uuid = Math.random().toString(36).substring(2, 15);
+      const tempInputPath = `tmp/input/${timestamp}-${uuid}`;
+      const tempOutputPath = `tmp/vision-output/${timestamp}-${uuid}/`;
+      
+      const bucket = this.storage.bucket(tempBucket);
+      const tempFile = bucket.file(tempInputPath);
+      
+      console.log(`Uploading ${docType} to temp location:`, tempInputPath);
+      await tempFile.save(fileBuffer, {
+        metadata: {
+          contentType: mimeType
+        }
+      });
+      
+      const tempGsUri = `gs://${tempBucket}/${tempInputPath}`;
+      const outputGsUri = `gs://${tempBucket}/${tempOutputPath}`;
+      
+      // Use Vision API asyncBatchAnnotateFiles
+      console.log(`Processing ${docType} with Vision API...`);
+      const [operation] = await this.client.asyncBatchAnnotateFiles({
+        requests: [{
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+          inputConfig: {
+            gcsSource: { uri: tempGsUri },
+            mimeType: mimeType
+          },
+          outputConfig: {
+            gcsDestination: { uri: outputGsUri }
+          }
+        }]
+      });
+      
+      console.log(`Waiting for ${docType} processing operation to complete...`);
+      const [result] = await operation.promise();
+      
+      // Read all output files  
+      const [outputFiles] = await bucket.getFiles({ 
+        prefix: tempOutputPath,
+        autoPaginate: true 
+      });
+      
+      if (outputFiles.length === 0) {
+        throw new Error(`No output files found from ${docType} processing`);
+      }
+      
+      console.log(`Found ${outputFiles.length} output files from Vision API`);
+      
+      // Sort files by name and extract text
+      outputFiles.sort((a, b) => a.name.localeCompare(b.name));
+      
+      let extractedText = '';
+      for (const file of outputFiles) {
+        try {
+          const [content] = await file.download();
+          const jsonResult = JSON.parse(content.toString());
+          
+          if (jsonResult.responses) {
+            for (const response of jsonResult.responses) {
+              if (response.fullTextAnnotation && response.fullTextAnnotation.text) {
+                extractedText += response.fullTextAnnotation.text;
+                if (!extractedText.endsWith('\n')) {
+                  extractedText += '\n';
+                }
+              }
+            }
+          }
+        } catch (parseError) {
+          console.warn(`Failed to parse output file ${file.name}:`, parseError);
+        }
+      }
+      
+      // Clean up temporary files
+      try {
+        console.log('Cleaning up temporary files...');
+        await tempFile.delete();
+        await Promise.all(outputFiles.map(file => file.delete().catch(err => {
+          console.warn(`Failed to delete ${file.name}:`, err);
+        })));
+        console.log('✅ Cleanup completed');
+      } catch (cleanupError) {
+        console.warn('⚠️ Some cleanup operations failed:', cleanupError);
+      }
+      
+      if (!extractedText.trim()) {
+        throw new Error(`No text detected in the ${docType} document`);
+      }
+      
+      console.log(`✅ Successfully extracted text from ${docType}, length:`, extractedText.length);
       return extractedText.trim();
       
     } catch (error) {
