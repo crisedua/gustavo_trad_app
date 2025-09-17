@@ -346,13 +346,13 @@ export class OCRService {
       const docType = mimeType === 'application/pdf' ? 'PDF' : 'TIFF';
       console.log(`Processing ${docType} from buffer using temp bucket approach...`);
       
-      // Check for temp bucket configuration
-      const tempBucket = process.env.OCR_TEMP_BUCKET;
+      // Extract bucket name from the original GS URI to use for temporary processing
+      const tempBucket = originalGsUri.split('/')[2];
       if (!tempBucket) {
-        throw new Error(`${docType} processing requires OCR_TEMP_BUCKET environment variable. Please set this to a Google Cloud Storage bucket name that your service account can access.`);
+        throw new Error(`Could not extract bucket name from URI: ${originalGsUri}`);
       }
       
-      console.log('Using temp bucket:', tempBucket);
+      console.log('Using existing object storage bucket for temporary processing:', tempBucket);
       
       // Upload buffer to temporary location in user's bucket
       const timestamp = Date.now();
