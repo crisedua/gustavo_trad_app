@@ -199,21 +199,33 @@ export default function DocumentProcessor() {
   };
 
   return (
-    <div className="bg-background text-foreground min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-slate-900">
       {/* Header */}
-      <header className="bg-card border-b border-border shadow-sm">
+      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-gray-700/50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <FileText className="text-primary text-2xl" data-testid="logo-icon" />
-                <h1 className="text-xl font-bold text-foreground" data-testid="app-title">Document Processor</h1>
+          <div className="flex justify-between items-center h-20">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <FileText className="text-white text-xl" data-testid="logo-icon" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent" data-testid="app-title">
+                    Document Processor
+                  </h1>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">AI-Powered Document Extraction</p>
+                </div>
               </div>
-              <span className="text-sm text-muted-foreground">AI-Powered Document Extraction</span>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <Link href="/">
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+                  <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
+                  Home
+                </Button>
+              </Link>
               <Link href="/admin/templates">
-                <Button variant="outline" size="sm" data-testid="button-admin">
+                <Button variant="outline" size="sm" className="border-blue-200 hover:bg-blue-50 dark:border-blue-800 dark:hover:bg-blue-950" data-testid="button-admin">
                   <Settings className="h-4 w-4 mr-2" />
                   Template Admin
                 </Button>
@@ -221,26 +233,34 @@ export default function DocumentProcessor() {
               <Button variant="ghost" size="sm" data-testid="button-help">
                 <HelpCircle className="h-4 w-4" />
               </Button>
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium" data-testid="user-avatar">
-                <User className="h-4 w-4" />
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center shadow-lg" data-testid="user-avatar">
+                <User className="h-5 w-5" />
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Left Column: Document Upload & Processing */}
           <div className="lg:col-span-2 space-y-6">
             
             {/* Document Upload */}
-            <Card data-testid="card-document-upload">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Document Upload</h2>
-                  <span className="text-sm text-muted-foreground">Step 1 of 3</span>
+            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-document-upload">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                      <Upload className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Document Upload</h2>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-green-700 dark:text-green-300">Step 1 of 3</span>
+                  </div>
                 </div>
                 
                 <div className="space-y-4">
@@ -251,14 +271,31 @@ export default function DocumentProcessor() {
                     onComplete={handleUploadComplete}
                     buttonClassName="w-full"
                   >
-                    <div className="upload-zone border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer" data-testid="upload-zone">
-                      <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium text-foreground mb-2">Drop your documents here</h3>
-                      <p className="text-muted-foreground mb-4">or click to browse files</p>
-                      <div className="flex justify-center space-x-4 text-sm text-muted-foreground">
-                        <span><FileText className="inline h-4 w-4 text-red-500 mr-1" />PDF</span>
-                        <span><FileIcon className="inline h-4 w-4 text-blue-500 mr-1" />Images</span>
-                        <span><FileText className="inline h-4 w-4 text-green-500 mr-1" />DOCX</span>
+                    <div className="upload-zone relative border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-xl p-12 text-center cursor-pointer transition-all duration-300 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 group" data-testid="upload-zone">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="relative z-10">
+                        <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-transform duration-300">
+                          <Upload className="h-10 w-10 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">Drop your documents here</h3>
+                        <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">or click to browse files from your computer</p>
+                        <div className="flex justify-center space-x-6 text-sm">
+                          <div className="flex items-center space-x-2 bg-red-50 dark:bg-red-900/30 px-4 py-2 rounded-full">
+                            <FileText className="h-5 w-5 text-red-500" />
+                            <span className="font-medium text-red-700 dark:text-red-300">PDF</span>
+                          </div>
+                          <div className="flex items-center space-x-2 bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-full">
+                            <FileIcon className="h-5 w-5 text-blue-500" />
+                            <span className="font-medium text-blue-700 dark:text-blue-300">Images</span>
+                          </div>
+                          <div className="flex items-center space-x-2 bg-green-50 dark:bg-green-900/30 px-4 py-2 rounded-full">
+                            <FileText className="h-5 w-5 text-green-500" />
+                            <span className="font-medium text-green-700 dark:text-green-300">DOCX</span>
+                          </div>
+                        </div>
+                        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                          Maximum file size: 10MB
+                        </div>
                       </div>
                     </div>
                   </ObjectUploader>
@@ -288,11 +325,19 @@ export default function DocumentProcessor() {
             </Card>
 
             {/* Processing Status */}
-            <Card data-testid="card-processing-status">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Processing Status</h2>
-                  <span className="text-sm text-muted-foreground">Step 2 of 3</span>
+            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-processing-status">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                      <Settings className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Processing Status</h2>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Step 2 of 3</span>
+                  </div>
                 </div>
                 
                 {currentJob ? (
@@ -370,10 +415,12 @@ export default function DocumentProcessor() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center text-muted-foreground py-8" data-testid="no-active-job">
-                    <Clock className="mx-auto h-12 w-12 mb-4" />
-                    <p>No document processing in progress.</p>
-                    <p className="text-sm">Upload a document to start processing.</p>
+                  <div className="text-center py-12" data-testid="no-active-job">
+                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Clock className="h-12 w-12 text-gray-500 dark:text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No document processing in progress</h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm max-w-md mx-auto">Upload a document above to start the AI-powered extraction and processing workflow.</p>
                   </div>
                 )}
               </CardContent>
@@ -381,9 +428,14 @@ export default function DocumentProcessor() {
 
             {/* Extracted Data */}
             {currentJob?.extractedData && (
-              <Card data-testid="card-extracted-data">
-                <CardContent className="p-6">
-                  <h2 className="text-lg font-semibold text-foreground mb-4">Extracted Data</h2>
+              <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-extracted-data">
+                <CardContent className="p-8">
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                      <FileText className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Extracted Data</h2>
+                  </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {Object.entries(currentJob.extractedData)
@@ -434,16 +486,19 @@ export default function DocumentProcessor() {
           <div className="space-y-6">
             
             {/* Template Selection */}
-            <Card data-testid="card-template-selection">
+            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-template-selection">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Template Selection</h2>
-                  <Link href="/admin/templates">
-                    <Button variant="outline" size="sm" data-testid="button-manage-templates">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Manage Templates
-                    </Button>
-                  </Link>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
+                      <FileText className="h-4 w-4 text-white" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Template Selection</h2>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-orange-100 dark:bg-orange-900/30 px-3 py-1 rounded-full">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Step 3 of 3</span>
+                  </div>
                 </div>
                 
                 <div className="space-y-3">
