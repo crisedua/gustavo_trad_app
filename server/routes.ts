@@ -274,8 +274,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No template selected for this job" });
       }
 
-      if (!job.fieldMappings) {
-        return res.status(400).json({ error: "No field mappings available for this job" });
+      if (!job.extractedFieldValues) {
+        return res.status(400).json({ error: "No extracted field values available for this job" });
       }
 
       const template = await storage.getTemplate(job.templateId);
@@ -291,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In production, you'd use the actual template file
       const generatedPdfBuffer = await documentGenerationService.fillPDFTemplate(
         template.filePath, 
-        job.fieldMappings
+        job.extractedFieldValues
       );
 
       // TODO: Save generated document to object storage
@@ -347,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let extractedData: Record<string, string>;
       try {
         const template = job.templateId ? await storage.getTemplate(job.templateId) : null;
-        const templateFields = template?.fields || [];
+        const templateFields = template ? Object.keys(template.fieldMappings) : [];
         
         extractedData = await fieldExtractionService.extractFields(extractedText, templateFields);
       } catch (error) {
@@ -368,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             fieldMappings = await fieldExtractionService.enhanceFieldMapping(
               extractedData, 
-              template.fields
+              Object.keys(template.fieldMappings)
             );
           } catch (error) {
             console.error("Field mapping failed:", error);
@@ -381,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update job with final results
       await storage.updateProcessingJob(jobId, {
         status: 'completed',
-        fieldMappings,
+        extractedFieldValues: fieldMappings,
         extractedData
       });
 

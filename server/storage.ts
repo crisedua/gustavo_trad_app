@@ -1,4 +1,4 @@
-import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser } from "@shared/schema";
+import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser, type TemplateFieldMappings, getFieldNamesFromMappings } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -28,40 +28,276 @@ export class MemStorage implements IStorage {
   private processingJobs: Map<string, ProcessingJob> = new Map();
 
   constructor() {
-    // Add default marriage certificate template
+    // Add default marriage certificate template with new fieldMappings structure
+    const defaultFieldMappings: TemplateFieldMappings = {
+      "serial_indicator": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 750, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Serial Indicator',
+          description: 'Certificate serial number or identifier',
+          validation: { required: true, maxLength: 50 }
+        }
+      },
+      "registry_country": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 700, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Registry Country',
+          description: 'Country where the marriage was registered',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "registry_department": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 650, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Registry Department',
+          description: 'Department or state where registered',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "registry_municipality": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 600, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Registry Municipality',
+          description: 'Municipality where registered',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "registry_date_of_registration": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 350, y: 600, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'date',
+          label: 'Registry Date',
+          description: 'Date of registration',
+          validation: { required: true, format: 'date' },
+          displayOptions: { dateFormat: 'YYYY-MM-DD' }
+        }
+      },
+      "party_a_names": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 450, width: 250, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Party A - First Names',
+          description: 'First names of party A',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "party_a_surnames": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 400, width: 250, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Party A - Surnames',
+          description: 'Surnames of party A',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "party_a_document_type": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 350, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'select',
+          label: 'Party A - Document Type',
+          description: 'Type of identification document',
+          validation: { required: true },
+          displayOptions: { 
+            options: ['Cedula', 'Passport', 'ID Card', 'Other'] 
+          }
+        }
+      },
+      "party_a_document_number": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 280, y: 350, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Party A - Document Number',
+          description: 'Document identification number',
+          validation: { required: true, maxLength: 50 }
+        }
+      },
+      "party_b_names": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 250, width: 250, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Party B - First Names',
+          description: 'First names of party B',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "party_b_surnames": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 200, width: 250, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Party B - Surnames',
+          description: 'Surnames of party B',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "party_b_document_type": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 150, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'select',
+          label: 'Party B - Document Type',
+          description: 'Type of identification document',
+          validation: { required: true },
+          displayOptions: { 
+            options: ['Cedula', 'Passport', 'ID Card', 'Other'] 
+          }
+        }
+      },
+      "party_b_document_number": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 280, y: 150, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Party B - Document Number',
+          description: 'Document identification number',
+          validation: { required: true, maxLength: 50 }
+        }
+      }
+    };
+
     const defaultTemplate: Template = {
       id: "default-marriage-cert",
       name: "Marriage Certificate Template",
       description: "National Civil Registry format",
       filePath: "/public-objects/templates/marriage_certificate_template.pdf",
-      fields: [
-        "serial_indicator",
-        "registry_country",
-        "registry_department", 
-        "registry_municipality",
-        "registry_date_of_registration",
-        "registry_office_type",
-        "registry_office_name",
-        "marriage_country",
-        "marriage_department",
-        "marriage_municipality", 
-        "marriage_date_of_registration",
-        "marriage_type",
-        "party_a_names",
-        "party_a_surnames",
-        "party_a_document_type",
-        "party_a_document_number",
-        "party_b_names",
-        "party_b_surnames", 
-        "party_b_document_type",
-        "party_b_document_number",
-        "issue_day",
-        "issue_month",
-        "issue_year",
-        "authorized_name",
-        "authorized_title"
-      ] as string[],
+      fieldMappings: defaultFieldMappings,
+      isAutoCreated: false,
+      sourceDocumentPath: null,
+      templateType: "marriage_certificate",
+      detectionMetadata: {
+        detectionMethod: "template_predefined",
+        confidence: 1.0,
+        totalMarkersFound: Object.keys(defaultFieldMappings).length,
+        processingTime: 0,
+        ocrAccuracy: 1.0
+      },
+      validationRules: {
+        globalRules: {
+          requireAllFields: true,
+          allowPartialFill: false,
+          formCompletionThreshold: 100
+        }
+      },
       createdAt: new Date(),
+      updatedAt: new Date()
     };
     this.templates.set(defaultTemplate.id, defaultTemplate);
   }
@@ -92,8 +328,14 @@ export class MemStorage implements IStorage {
       name: insertTemplate.name,
       description: insertTemplate.description ?? null,
       filePath: insertTemplate.filePath,
-      fields: insertTemplate.fields as string[],
-      createdAt: new Date()
+      fieldMappings: insertTemplate.fieldMappings,
+      isAutoCreated: insertTemplate.isAutoCreated ?? false,
+      sourceDocumentPath: insertTemplate.sourceDocumentPath ?? null,
+      templateType: insertTemplate.templateType ?? null,
+      detectionMetadata: insertTemplate.detectionMetadata ?? null,
+      validationRules: insertTemplate.validationRules ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     this.templates.set(id, template);
     return template;
@@ -128,7 +370,7 @@ export class MemStorage implements IStorage {
       id,
       extractedData: insertJob.extractedData ?? null,
       templateId: insertJob.templateId ?? null,
-      fieldMappings: insertJob.fieldMappings ?? null,
+      extractedFieldValues: insertJob.extractedFieldValues ?? null,
       errorMessage: null,
       generatedDocumentPath: null,
       createdAt: new Date(),
