@@ -1,6 +1,7 @@
 import { ImageAnnotatorClient } from '@google-cloud/vision';
 import { Storage } from '@google-cloud/storage';
 import { objectStorageClient } from '../objectStorage';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 export class OCRService {
   private client: ImageAnnotatorClient;
@@ -77,13 +78,15 @@ export class OCRService {
         const fileType = this.detectFileType(fileBuffer, filePath);
         console.log('Detected file type:', fileType);
         
-        if (fileType === 'pdf' || fileType === 'tiff') {
-          // Process document using buffer (requires special handling)
-          const mimeType = fileType === 'pdf' ? 'application/pdf' : 'image/tiff';
-          return await this.extractTextFromDocumentBuffer(fileBuffer, mimeType, gsUri);
+        if (fileType === 'pdf') {
+          // Process PDF using PDF-to-image conversion (no bucket permissions needed)
+          return await this.extractTextFromPDFBuffer(fileBuffer);
+        } else if (fileType === 'tiff') {
+          // Process TIFF as image using direct buffer approach
+          return await this.extractTextFromImageBuffer(fileBuffer);
         } else {
           // Process as image using buffer
-          return await this.extractTextFromBuffer(fileBuffer);
+          return await this.extractTextFromImageBuffer(fileBuffer);
         }
       }
       
@@ -93,11 +96,14 @@ export class OCRService {
         const fileType = this.detectFileType(fileBuffer, filePath);
         console.log('Detected file type for gs:// URI:', fileType);
         
-        if (fileType === 'pdf' || fileType === 'tiff') {
-          const mimeType = fileType === 'pdf' ? 'application/pdf' : 'image/tiff';
-          return await this.extractTextFromDocumentBuffer(fileBuffer, mimeType, filePath);
+        if (fileType === 'pdf') {
+          // Process PDF using PDF-to-image conversion (no bucket permissions needed)
+          return await this.extractTextFromPDFBuffer(fileBuffer);
+        } else if (fileType === 'tiff') {
+          // Process TIFF as image using direct buffer approach
+          return await this.extractTextFromImageBuffer(fileBuffer);
         } else {
-          return await this.extractTextFromBuffer(fileBuffer);
+          return await this.extractTextFromImageBuffer(fileBuffer);
         }
       }
       
@@ -341,109 +347,84 @@ export class OCRService {
     }
   }
 
-  private async extractTextFromDocumentBuffer(fileBuffer: Buffer, mimeType: string, originalGsUri: string): Promise<string> {
+  private async extractTextFromPDFBuffer(fileBuffer: Buffer): Promise<string> {
     try {
-      const docType = mimeType === 'application/pdf' ? 'PDF' : 'TIFF';
-      console.log(`Processing ${docType} from buffer using temp bucket approach...`);
+      console.log('Processing PDF using direct text extraction...');
       
-      // Extract bucket name from the original GS URI to use for temporary processing
-      const tempBucket = originalGsUri.split('/')[2];
-      if (!tempBucket) {
-        throw new Error(`Could not extract bucket name from URI: ${originalGsUri}`);
+      // Load the PDF document from buffer
+      const loadingTask = pdfjsLib.getDocument(fileBuffer);
+      const pdfDocument = await loadingTask.promise;
+      
+      console.log(`PDF loaded with ${pdfDocument.numPages} pages`);
+      
+      if (pdfDocument.numPages === 0) {
+        throw new Error('PDF has no pages');
       }
       
-      console.log('Using existing object storage bucket for temporary processing:', tempBucket);
-      
-      // Upload buffer to temporary location in user's bucket
-      const timestamp = Date.now();
-      const uuid = Math.random().toString(36).substring(2, 15);
-      const tempInputPath = `tmp/input/${timestamp}-${uuid}`;
-      const tempOutputPath = `tmp/vision-output/${timestamp}-${uuid}/`;
-      
-      const bucket = this.storage.bucket(tempBucket);
-      const tempFile = bucket.file(tempInputPath);
-      
-      console.log(`Uploading ${docType} to temp location:`, tempInputPath);
-      await this.uploadWithFallback(tempBucket, tempInputPath, fileBuffer, mimeType);
-      
-      const tempGsUri = `gs://${tempBucket}/${tempInputPath}`;
-      const outputGsUri = `gs://${tempBucket}/${tempOutputPath}`;
-      
-      // Use Vision API asyncBatchAnnotateFiles
-      console.log(`Processing ${docType} with Vision API...`);
-      const [operation] = await this.client.asyncBatchAnnotateFiles({
-        requests: [{
-          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-          inputConfig: {
-            gcsSource: { uri: tempGsUri },
-            mimeType: mimeType
-          },
-          outputConfig: {
-            gcsDestination: { uri: outputGsUri }
-          }
-        }]
-      });
-      
-      console.log(`Waiting for ${docType} processing operation to complete...`);
-      const [result] = await operation.promise();
-      
-      // Read all output files  
-      const outputFiles = await this.listFilesWithFallback(tempBucket, tempOutputPath);
-      
-      if (outputFiles.length === 0) {
-        throw new Error(`No output files found from ${docType} processing`);
-      }
-      
-      console.log(`Found ${outputFiles.length} output files from Vision API`);
-      
-      // Sort files by name and extract text
-      outputFiles.sort((a, b) => a.name.localeCompare(b.name));
-      
-      let extractedText = '';
-      for (const file of outputFiles) {
+      // Extract text from each page
+      let combinedText = '';
+      for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+        console.log(`Extracting text from page ${pageNum}/${pdfDocument.numPages}...`);
+        
         try {
-          const [content] = await file.download();
-          const jsonResult = JSON.parse(content.toString());
+          // Get the page
+          const page = await pdfDocument.getPage(pageNum);
           
-          if (jsonResult.responses) {
-            for (const response of jsonResult.responses) {
-              if (response.fullTextAnnotation && response.fullTextAnnotation.text) {
-                extractedText += response.fullTextAnnotation.text;
-                if (!extractedText.endsWith('\n')) {
-                  extractedText += '\n';
-                }
-              }
+          // Extract text content directly from PDF
+          const textContent = await page.getTextContent();
+          
+          // Combine all text items from the page
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ')
+            .trim();
+          
+          if (pageText) {
+            combinedText += pageText;
+            if (!combinedText.endsWith('\n')) {
+              combinedText += '\n';
             }
+            console.log(`✅ Page ${pageNum} processed, extracted ${pageText.length} characters`);
+          } else {
+            console.log(`⚠️ Page ${pageNum} contained no text`);
           }
-        } catch (parseError) {
-          console.warn(`Failed to parse output file ${file.name}:`, parseError);
+        } catch (pageError) {
+          console.warn(`Failed to process page ${pageNum}:`, pageError);
+          // Continue with other pages even if one fails
         }
       }
       
-      // Clean up temporary files
-      try {
-        console.log('Cleaning up temporary files...');
-        await this.deleteFileWithFallback(tempBucket, tempInputPath);
-        await Promise.all(outputFiles.map(file => 
-          this.deleteFileWithFallback(tempBucket, file.name).catch(err => {
-            console.warn(`Failed to delete ${file.name}:`, err);
-          })
-        ));
-        console.log('✅ Cleanup completed');
-      } catch (cleanupError) {
-        console.warn('⚠️ Some cleanup operations failed:', cleanupError);
+      if (!combinedText.trim()) {
+        throw new Error('No text detected in any PDF pages');
       }
       
-      if (!extractedText.trim()) {
-        throw new Error(`No text detected in the ${docType} document`);
-      }
-      
-      console.log(`✅ Successfully extracted text from ${docType}, length:`, extractedText.length);
-      return extractedText.trim();
+      console.log(`✅ Successfully extracted text from PDF (${pdfDocument.numPages} pages), total length:`, combinedText.length);
+      return combinedText.trim();
       
     } catch (error) {
-      console.error(`${mimeType} processing failed:`, error);
-      throw new Error(`Document processing failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('PDF processing failed:', error);
+      throw new Error(`PDF processing failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async extractTextFromImageBuffer(imageBuffer: Buffer): Promise<string> {
+    try {
+      // Use Vision API textDetection for image buffers (works great for images)
+      const [result] = await this.client.textDetection({
+        image: { content: imageBuffer }
+      });
+
+      const detections = result.textAnnotations;
+      if (!detections || detections.length === 0) {
+        return '';
+      }
+
+      // First annotation contains the full text
+      const fullText = detections[0]?.description || '';
+      return fullText;
+    } catch (error) {
+      console.error('Image OCR failed:', error);
+      throw new Error(`Image OCR failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
