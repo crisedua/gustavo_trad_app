@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/templates", upload.single('templateFile'), async (req, res) => {
     try {
-      const { name, description, fields } = req.body;
+      const { name, description, fields, autoAnalyze = 'true' } = req.body;
       const templateFile = req.file;
 
       if (!templateFile) {
@@ -128,6 +128,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse fields if provided as string (legacy format)
       // Convert to new fieldMappings format or provide empty structure
       let fieldMappings = {};
+      let detectionMetadata = {};
+      
       if (fields) {
         try {
           const parsedFields = JSON.parse(fields);
@@ -142,6 +144,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Automatically analyze template if no fields provided or autoAnalyze is enabled
+      const shouldAutoAnalyze = !fields || autoAnalyze === 'true';
+      
+      if (shouldAutoAnalyze) {
+        try {
+          console.log('Starting automated template analysis for:', name);
+          
+          // Analyze the uploaded template file for field mappings
+          const analysisResult = await templateAnalysisService.analyzeTemplate(templateFile.path);
+          
+          // Use the automatically detected field mappings
+          fieldMappings = analysisResult.fieldMappings;
+          detectionMetadata = {
+            ...analysisResult.detectionMetadata,
+            autoDetected: true,
+            analysisTimestamp: new Date().toISOString(),
+            sourceFilePath: templateFile.path,
+            originalFilename: templateFile.originalname
+          };
+          
+          console.log('✅ Automated template analysis completed:', {
+            fieldsDetected: analysisResult.analysisReport.fieldsIdentified,
+            markersFound: analysisResult.analysisReport.totalMarkersFound,
+            averageConfidence: analysisResult.analysisReport.averageConfidence,
+            processingTime: analysisResult.analysisReport.processingTime
+          });
+          
+        } catch (analysisError) {
+          console.error('Template analysis failed:', analysisError);
+          
+          // Don't fail the template creation, just log the error and continue with manual fields
+          console.log('Continuing with manual field mappings due to analysis failure');
+          
+          // Create basic detection metadata indicating analysis failed
+          detectionMetadata = {
+            autoDetected: false,
+            analysisError: analysisError instanceof Error ? analysisError.message : String(analysisError),
+            analysisTimestamp: new Date().toISOString(),
+            sourceFilePath: templateFile.path,
+            originalFilename: templateFile.originalname
+          };
+        }
+      } else {
+        // Manual field mapping
+        detectionMetadata = {
+          autoDetected: false,
+          manualConfiguration: true,
+          analysisTimestamp: new Date().toISOString(),
+          sourceFilePath: templateFile.path,
+          originalFilename: templateFile.originalname
+        };
+      }
+
       // TODO: Upload template file to object storage
       // For now, store locally 
       const templatePath = `/templates/${templateFile.filename}`;
@@ -150,11 +205,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         description: description || null,
         filePath: templatePath,
-        fieldMappings
+        fieldMappings,
+        detectionMetadata
       });
 
       const template = await storage.createTemplate(templateData);
-      res.status(201).json(template);
+      
+      // Include analysis results in response for frontend feedback
+      const response = {
+        ...template,
+        autoAnalysisPerformed: shouldAutoAnalyze,
+        ...(shouldAutoAnalyze && {
+          analysisResults: {
+            fieldsDetected: Object.keys(fieldMappings).length,
+            analysisSuccessful: !(detectionMetadata as any).analysisError,
+            processingTime: (detectionMetadata as any).processingTime || 0
+          }
+        })
+      };
+      
+      res.status(201).json(response);
     } catch (error) {
       console.error("Error creating template:", error);
       res.status(500).json({ error: "Failed to create template" });

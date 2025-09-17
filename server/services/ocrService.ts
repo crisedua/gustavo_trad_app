@@ -4,6 +4,8 @@ import { objectStorageClient } from '../objectStorage';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as path from 'path';
 import * as fs from 'fs';
+import { PathValidator } from '../security/pathValidator';
+import { SSRFProtection } from '../security/ssrfProtection';
 
 export class OCRService {
   private client: ImageAnnotatorClient;
@@ -70,34 +72,24 @@ export class OCRService {
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
         let fileBuffer: Buffer;
         
-        // Handle localhost URLs by mapping to filesystem paths
+        // Handle localhost URLs by mapping to filesystem paths (development only)
         if (filePath.includes('localhost') || filePath.includes('127.0.0.1')) {
-          console.log('Processing localhost URL via filesystem:', filePath.substring(0, 50) + '...');
+          console.log('OCRService: Processing localhost URL securely:', filePath.substring(0, 50) + '...');
           
-          // Convert localhost URL to filesystem path
+          // Securely convert localhost URL to filesystem path
           const url = new URL(filePath);
-          let localPath = '';
           
-          if (url.pathname.startsWith('/public-objects/')) {
-            // Map /public-objects/ to the actual filesystem directory
-            localPath = path.join(process.cwd(), 'public-objects', url.pathname.substring('/public-objects/'.length));
-          } else if (url.pathname.startsWith('/objects/')) {
-            // Map /objects/ to uploads directory 
-            localPath = path.join(process.cwd(), 'uploads', url.pathname.substring('/objects/'.length));
-          } else {
-            // Try direct file access in current directory
-            localPath = path.join(process.cwd(), url.pathname.substring(1));
-          }
+          // Use secure path validation to prevent traversal attacks
+          const localPath = PathValidator.mapLocalhostUrlToPath(url);
           
-          console.log('Mapped localhost URL to filesystem path:', localPath);
+          // Validate file exists and check size limits
+          PathValidator.validateFileExists(localPath);
+          PathValidator.validateFileSize(localPath, 10 * 1024 * 1024); // 10MB limit
           
-          // Check if file exists and read it
-          if (!fs.existsSync(localPath)) {
-            throw new Error(`File not found at filesystem path: ${localPath}`);
-          }
+          console.log('OCRService: Validated filesystem path:', localPath.substring(localPath.lastIndexOf(path.sep) + 1));
           
           fileBuffer = fs.readFileSync(localPath);
-          console.log('Read localhost file successfully from filesystem, size:', fileBuffer.length, 'bytes');
+          console.log('OCRService: Read localhost file securely, size:', fileBuffer.length, 'bytes');
         } else {
           // Convert to gs:// format for Google Cloud Storage URLs
           const gsUri = this.convertToGsUri(filePath);
