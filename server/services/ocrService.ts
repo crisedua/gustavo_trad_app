@@ -64,27 +64,32 @@ export class OCRService {
       
       // Check if filePath is a URL (signed URL from Google Cloud Storage)
       if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-        // Download and detect file type
-        const response = await fetch(filePath);
-        if (!response.ok) {
-          throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
-        }
+        // Convert to gs:// format and access using Storage client
+        const gsUri = this.convertToGsUri(filePath);
+        console.log('Converted to gs:// URI:', gsUri.substring(0, 30) + '...');
         
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        // Download file using Storage client
+        const bucketName = gsUri.split('/')[2];
+        const objectName = gsUri.split('/').slice(3).join('/');
+        
+        const bucket = this.storage.bucket(bucketName);
+        const file = bucket.file(objectName);
+        
+        // Download file content
+        const [fileBuffer] = await file.download();
+        console.log('Downloaded file successfully, size:', fileBuffer.length, 'bytes');
         
         // Detect file type from buffer
-        const fileType = this.detectFileType(buffer, filePath);
+        const fileType = this.detectFileType(fileBuffer, filePath);
         console.log('Detected file type:', fileType);
         
         if (fileType === 'pdf' || fileType === 'tiff') {
-          // Convert signed URL to gs:// format and process as document
-          const gsUri = this.convertToGsUri(filePath);
+          // Process document using gs:// URI directly
           const mimeType = fileType === 'pdf' ? 'application/pdf' : 'image/tiff';
           return await this.extractTextFromDocument(gsUri, mimeType);
         } else {
-          // Process as image
-          return await this.extractTextFromBuffer(buffer);
+          // Process as image using the downloaded buffer
+          return await this.extractTextFromBuffer(fileBuffer);
         }
       }
       
@@ -163,22 +168,10 @@ export class OCRService {
     try {
       const url = new URL(httpsUrl);
       
-      // Handle multiple GCS URL formats
-      if (url.hostname === 'storage.googleapis.com') {
-        // Format: https://storage.googleapis.com/bucket-name/object-name
-        const pathParts = url.pathname.split('/').filter(part => part);
-        if (pathParts.length >= 2) {
-          const bucketName = pathParts[0];
-          const objectName = pathParts.slice(1).join('/');
-          return `gs://${bucketName}/${objectName}`;
-        }
-      } else if (url.hostname.endsWith('.storage.googleapis.com')) {
-        // Format: https://bucket-name.storage.googleapis.com/object-name
-        const bucketName = url.hostname.replace('.storage.googleapis.com', '');
-        const objectName = url.pathname.substring(1); // Remove leading /
-        return `gs://${bucketName}/${objectName}`;
-      } else if (url.pathname.startsWith('/download/storage/v1/b/')) {
-        // Format: https://storage.googleapis.com/download/storage/v1/b/bucket/o/object
+      // Handle multiple GCS URL formats - check specific patterns first!
+      
+      // Format 1: https://storage.googleapis.com/download/storage/v1/b/bucket/o/object
+      if (url.pathname.startsWith('/download/storage/v1/b/')) {
         const pathMatch = url.pathname.match(/\/download\/storage\/v1\/b\/([^/]+)\/o\/(.+)/);
         if (pathMatch) {
           const bucketName = pathMatch[1];
@@ -187,8 +180,38 @@ export class OCRService {
         }
       }
       
-      throw new Error('Invalid Google Cloud Storage URL format');
+      // Format 2: https://bucket-name.storage.googleapis.com/object-name
+      if (url.hostname.endsWith('.storage.googleapis.com')) {
+        const bucketName = url.hostname.replace('.storage.googleapis.com', '');
+        const objectName = url.pathname.substring(1); // Remove leading /
+        if (bucketName && objectName) {
+          return `gs://${bucketName}/${decodeURIComponent(objectName)}`;
+        }
+      }
+      
+      // Format 3: https://storage.googleapis.com/bucket-name/object-name (simple path)
+      if (url.hostname === 'storage.googleapis.com' && !url.pathname.startsWith('/download/')) {
+        const pathParts = url.pathname.split('/').filter(part => part);
+        if (pathParts.length >= 2) {
+          const bucketName = pathParts[0];
+          const objectName = pathParts.slice(1).join('/');
+          return `gs://${bucketName}/${decodeURIComponent(objectName)}`;
+        }
+      }
+      
+      // Format 4: https://storage.cloud.google.com/bucket-name/object-name
+      if (url.hostname === 'storage.cloud.google.com') {
+        const pathParts = url.pathname.split('/').filter(part => part);
+        if (pathParts.length >= 2) {
+          const bucketName = pathParts[0];
+          const objectName = pathParts.slice(1).join('/');
+          return `gs://${bucketName}/${decodeURIComponent(objectName)}`;
+        }
+      }
+      
+      throw new Error(`Unsupported Google Cloud Storage URL format. Host: ${url.hostname}, Path: ${url.pathname.substring(0, 50)}...`);
     } catch (error) {
+      console.error('URL conversion failed for:', httpsUrl.substring(0, 50) + '...');
       throw new Error(`Failed to convert URL to gs:// format: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
