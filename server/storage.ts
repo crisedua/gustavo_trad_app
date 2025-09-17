@@ -88,9 +88,11 @@ export class MemStorage implements IStorage {
   async createTemplate(insertTemplate: InsertTemplate): Promise<Template> {
     const id = randomUUID();
     const template: Template = { 
-      ...insertTemplate, 
       id,
+      name: insertTemplate.name,
       description: insertTemplate.description ?? null,
+      filePath: insertTemplate.filePath,
+      fields: insertTemplate.fields as string[],
       createdAt: new Date()
     };
     this.templates.set(id, template);

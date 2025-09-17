@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTemplateSchema, insertProcessingJobSchema } from "@shared/schema";
+import { insertTemplateSchema, updateTemplateSchema, insertProcessingJobSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { OCRService } from "./services/ocrService";
 import { FieldExtractionService } from "./services/fieldExtractionService";
@@ -121,6 +121,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching template:", error);
       res.status(500).json({ error: "Failed to fetch template" });
+    }
+  });
+
+  app.patch("/api/templates/:id", async (req, res) => {
+    try {
+      const templateId = req.params.id;
+      
+      // Check if template exists
+      const existingTemplate = await storage.getTemplate(templateId);
+      if (!existingTemplate) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+
+      // Validate updates using the updateTemplateSchema
+      const updates = updateTemplateSchema.parse(req.body);
+      
+      // Ensure name is not empty if provided
+      if (updates.name !== undefined && !updates.name.trim()) {
+        return res.status(400).json({ error: "Template name cannot be empty" });
+      }
+
+      // Update the template
+      const updatedTemplate = await storage.updateTemplate(templateId, updates);
+      if (!updatedTemplate) {
+        return res.status(500).json({ error: "Failed to update template" });
+      }
+
+      res.json(updatedTemplate);
+    } catch (error) {
+      console.error("Error updating template:", error);
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid template data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/templates/:id", async (req, res) => {
+    try {
+      const templateId = req.params.id;
+      
+      // Check if template exists
+      const template = await storage.getTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+
+      // Check if template is being used by any processing jobs
+      const jobs = await storage.getProcessingJobs();
+      const templatesInUse = jobs.filter(job => job.templateId === templateId);
+      if (templatesInUse.length > 0) {
+        return res.status(400).json({ 
+          error: "Cannot delete template that is being used by processing jobs",
+          jobsCount: templatesInUse.length
+        });
+      }
+
+      // Delete the template
+      const deleted = await storage.deleteTemplate(templateId);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete template" });
+      }
+
+      // TODO: Clean up template file from object storage
+      // For now, just log the file path that should be cleaned up
+      console.log(`Template deleted, should clean up file: ${template.filePath}`);
+
+      res.json({ success: true, message: "Template deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ error: "Failed to delete template" });
     }
   });
 

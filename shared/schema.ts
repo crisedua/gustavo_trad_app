@@ -43,6 +43,11 @@ export const insertTemplateSchema = createInsertSchema(templates).pick({
   fields: true,
 });
 
+export const updateTemplateSchema = createInsertSchema(templates).pick({
+  name: true,
+  description: true,
+}).partial();
+
 export const insertProcessingJobSchema = createInsertSchema(processingJobs).pick({
   originalFilePath: true,
   status: true,
@@ -55,5 +60,6 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
+export type UpdateTemplate = z.infer<typeof updateTemplateSchema>;
 export type ProcessingJob = typeof processingJobs.$inferSelect;
 export type InsertProcessingJob = z.infer<typeof insertProcessingJobSchema>;
