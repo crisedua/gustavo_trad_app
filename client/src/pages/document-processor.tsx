@@ -19,8 +19,14 @@ interface Template {
   name: string;
   description: string;
   filePath: string;
-  fields: string[];
+  fieldMappings: Record<string, any>;
+  isAutoCreated?: boolean;
+  sourceDocumentPath?: string;
+  templateType?: string;
+  detectionMetadata?: any;
+  validationRules?: any;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface ProcessingJob {
@@ -29,7 +35,7 @@ interface ProcessingJob {
   status: string;
   extractedData?: Record<string, string>;
   templateId?: string;
-  fieldMappings?: Record<string, string>;
+  extractedFieldValues?: Record<string, string>;
   generatedDocumentPath?: string;
   errorMessage?: string;
   createdAt: string;
@@ -262,7 +268,7 @@ export default function DocumentProcessor() {
                       {selectedTemplate.description || 'No description'}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {selectedTemplate.fields.length} fields required
+                      {Object.keys(selectedTemplate.fieldMappings || {}).length} fields required
                     </div>
                   </div>
                 )}
