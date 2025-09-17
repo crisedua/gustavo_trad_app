@@ -43,7 +43,7 @@ Return ONLY a JSON object with field names as keys and extracted values as strin
       return extractedData;
     } catch (error) {
       console.error('Field extraction failed:', error);
-      throw new Error(`Field extraction failed: ${error.message}`);
+      throw new Error(`Field extraction failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -74,7 +74,7 @@ Only include mappings where you're confident about the match. If no good match e
       return fieldMappings;
     } catch (error) {
       console.error('Field mapping enhancement failed:', error);
-      throw new Error(`Field mapping failed: ${error.message}`);
+      throw new Error(`Field mapping failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
