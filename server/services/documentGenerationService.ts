@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -39,9 +39,9 @@ export class DocumentGenerationService {
         }
       }
 
-      // If no form fields, try text replacement approach
+      // If no form fields, create new PDF from scratch based on template
       if (fields.length === 0) {
-        return await this.fillPDFWithTextReplacement(templateBytes, fieldMappings);
+        return await this.createFilledPDFFromScratch(fieldMappings);
       }
 
       // Flatten the form (make fields non-editable)
@@ -56,109 +56,221 @@ export class DocumentGenerationService {
     }
   }
 
-  private async fillPDFWithTextReplacement(templateBytes: Uint8Array, fieldMappings: Record<string, string>): Promise<Buffer> {
+  private async createFilledPDFFromScratch(fieldMappings: Record<string, string>): Promise<Buffer> {
     try {
-      console.log('Implementing text-based template filling...');
+      console.log('Creating new PDF from scratch with filled data...');
       console.log('Field mappings:', fieldMappings);
       
-      // Load the original template
-      const templateDoc = await PDFDocument.load(templateBytes);
-      
-      // Create a new PDF document that preserves the template
+      // Create a new PDF document
       const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([612, 792]); // Standard letter size
+      const { width, height } = page.getSize();
       
-      // Copy pages from template to preserve layout
-      const templatePages = templateDoc.getPages();
-      const copiedPages = await pdfDoc.copyPages(templateDoc, Array.from({length: templatePages.length}, (_, i) => i));
+      // Embed standard font
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       
-      copiedPages.forEach(page => {
-        pdfDoc.addPage(page);
+      // Header Section
+      page.drawText('NATIONAL CIVIL REGISTRY', {
+        x: width / 2 - 120,
+        y: height - 60,
+        size: 16,
+        font: boldFont,
+        color: rgb(0, 0, 0),
       });
       
-      // Now overlay the extracted data on top of placeholders
-      const pages = pdfDoc.getPages();
+      page.drawText('DIGITAL CIVIL STATUS REGISTRATION', {
+        x: width / 2 - 140,
+        y: height - 90,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
       
-      if (pages.length > 0) {
-        const page = pages[0];
-        const { height } = page.getSize();
-        
-        // Based on the template image, map placeholders to more accurate coordinates
-        // PDF coordinates start from bottom-left, so we need to convert from top-left
-        const fieldPositions: Record<string, {x: number, y: number, size: number, width?: number}> = {
-          // Top section - Serial indicator and QR code
-          'serial_indicator': { x: 470, y: height - 55, size: 10, width: 80 },
-          
-          // Registry Office Information section  
-          'registry_country': { x: 120, y: height - 260, size: 9, width: 100 },
-          'registry_department': { x: 360, y: height - 260, size: 9, width: 120 },
-          'registry_municipality': { x: 515, y: height - 260, size: 9, width: 100 },
-          'registry_date_of_registration': { x: 470, y: height - 285, size: 9, width: 100 },
-          'registry_office_type': { x: 215, y: height - 305, size: 9, width: 100 },
-          'registry_office_name': { x: 360, y: height - 305, size: 9, width: 150 },
-          
-          // Marriage Information section
-          'marriage_country': { x: 120, y: height - 375, size: 9, width: 100 },
-          'marriage_department': { x: 360, y: height - 375, size: 9, width: 120 },
-          'marriage_municipality': { x: 515, y: height - 375, size: 9, width: 100 },
-          'marriage_date_of_registration': { x: 470, y: height - 400, size: 9, width: 100 },
-          'marriage_type': { x: 215, y: height - 420, size: 9, width: 100 },
-          
-          // Party A section
-          'party_a_names': { x: 120, y: height - 465, size: 9, width: 200 },
-          'party_a_surnames': { x: 380, y: height - 465, size: 9, width: 200 },
-          'party_a_document_type': { x: 170, y: height - 495, size: 9, width: 150 },
-          'party_a_document_number': { x: 425, y: height - 495, size: 9, width: 100 },
-          
-          // Party B section
-          'party_b_names': { x: 120, y: height - 540, size: 9, width: 200 },
-          'party_b_surnames': { x: 380, y: height - 540, size: 9, width: 200 },
-          'party_b_document_type': { x: 170, y: height - 570, size: 9, width: 150 },
-          'party_b_document_number': { x: 425, y: height - 570, size: 9, width: 100 },
-          
-          // Date of Issue section
-          'issue_day': { x: 120, y: height - 620, size: 9, width: 30 },
-          'issue_month': { x: 250, y: height - 620, size: 9, width: 30 },
-          'issue_year': { x: 390, y: height - 620, size: 9, width: 50 },
-          
-          // Authorized Signature section
-          'authorized_name': { x: 150, y: height - 670, size: 9, width: 200 },
-          'authorized_title': { x: 150, y: height - 690, size: 9, width: 200 }
-        };
-        
-        // Replace placeholders with extracted data
-        for (const [fieldName, value] of Object.entries(fieldMappings)) {
-          const position = fieldPositions[fieldName];
-          if (position && value) {
-            // Draw a white rectangle to cover the placeholder
-            page.drawRectangle({
-              x: position.x - 5,
-              y: position.y - 3,
-              width: position.width || 150,
-              height: 16,
-              color: rgb(1, 1, 1), // White color to cover placeholder
-            });
-            
-            // Draw the replacement text
-            page.drawText(String(value), {
-              x: position.x,
-              y: position.y,
-              size: position.size,
-              color: rgb(0, 0, 0), // Black text
-              maxWidth: position.width || 150,
-            });
-          }
-        }
-        
-        console.log(`Successfully placed ${Object.keys(fieldMappings).length} field values on template`);
+      // Serial Indicator - top right
+      if (fieldMappings.serial_indicator) {
+        page.drawText(fieldMappings.serial_indicator, {
+          x: width - 150,
+          y: height - 60,
+          size: 12,
+          font: font,
+          color: rgb(0, 0, 0),
+        });
       }
       
-      // Save the filled PDF
+      let currentY = height - 150;
+      
+      // Registry Office Information Section
+      page.drawText('Registry Office Information', {
+        x: 50,
+        y: currentY,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Create table-like structure
+      currentY -= 30;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Country', value: fieldMappings.registry_country || '', x: 50, width: 150 },
+        { label: 'Department', value: fieldMappings.registry_department || '', x: 210, width: 150 },
+        { label: 'Municipality', value: fieldMappings.registry_municipality || '', x: 370, width: 150 }
+      ]);
+      
+      currentY -= 40;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Date of Registration', value: fieldMappings.registry_date_of_registration || '', x: 50, width: 200 },
+        { label: 'Office Type', value: fieldMappings.registry_office_type || '', x: 260, width: 150 },
+        { label: 'Office Name/Number', value: fieldMappings.registry_office_name || '', x: 420, width: 150 }
+      ]);
+      
+      currentY -= 60;
+      
+      // Marriage Information Section
+      page.drawText('Marriage Information', {
+        x: 50,
+        y: currentY,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      currentY -= 30;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Country', value: fieldMappings.marriage_country || '', x: 50, width: 150 },
+        { label: 'Department', value: fieldMappings.marriage_department || '', x: 210, width: 150 },
+        { label: 'Municipality', value: fieldMappings.marriage_municipality || '', x: 370, width: 150 }
+      ]);
+      
+      currentY -= 40;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Date of Registration', value: fieldMappings.marriage_date_of_registration || '', x: 50, width: 200 },
+        { label: 'Marriage Type', value: fieldMappings.marriage_type || '', x: 260, width: 150 }
+      ]);
+      
+      currentY -= 60;
+      
+      // Party to the Marriage — A
+      page.drawText('Party to the Marriage — A', {
+        x: 50,
+        y: currentY,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      currentY -= 30;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Names', value: fieldMappings.party_a_names || '', x: 50, width: 200 },
+        { label: 'Surnames', value: fieldMappings.party_a_surnames || '', x: 260, width: 200 }
+      ]);
+      
+      currentY -= 40;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Document Type', value: fieldMappings.party_a_document_type || '', x: 50, width: 200 },
+        { label: 'Document Number', value: fieldMappings.party_a_document_number || '', x: 260, width: 200 }
+      ]);
+      
+      currentY -= 60;
+      
+      // Party to the Marriage — B
+      page.drawText('Party to the Marriage — B', {
+        x: 50,
+        y: currentY,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      currentY -= 30;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Names', value: fieldMappings.party_b_names || '', x: 50, width: 200 },
+        { label: 'Surnames', value: fieldMappings.party_b_surnames || '', x: 260, width: 200 }
+      ]);
+      
+      currentY -= 40;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Document Type', value: fieldMappings.party_b_document_type || '', x: 50, width: 200 },
+        { label: 'Document Number', value: fieldMappings.party_b_document_number || '', x: 260, width: 200 }
+      ]);
+      
+      currentY -= 60;
+      
+      // Date of Issue
+      page.drawText('Date of Issue', {
+        x: 50,
+        y: currentY,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      currentY -= 30;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Day', value: fieldMappings.issue_day || '', x: 50, width: 80 },
+        { label: 'Month', value: fieldMappings.issue_month || '', x: 140, width: 80 },
+        { label: 'Year', value: fieldMappings.issue_year || '', x: 230, width: 80 }
+      ]);
+      
+      currentY -= 60;
+      
+      // Authorized Signature
+      page.drawText('Authorized Signature', {
+        x: 50,
+        y: currentY,
+        size: 14,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      currentY -= 30;
+      this.drawTableRow(page, font, currentY, [
+        { label: 'Name', value: fieldMappings.authorized_name || '', x: 50, width: 250 },
+        { label: 'Title', value: fieldMappings.authorized_title || '', x: 310, width: 250 }
+      ]);
+      
+      console.log(`Successfully created filled PDF with ${Object.keys(fieldMappings).length} fields`);
+      
+      // Save the PDF
       const filledPdfBytes = await pdfDoc.save();
       return Buffer.from(filledPdfBytes);
       
     } catch (error) {
-      console.error('Text replacement failed:', error);
+      console.error('PDF creation from scratch failed:', error);
       throw error;
+    }
+  }
+
+  private drawTableRow(page: any, font: any, y: number, fields: Array<{label: string, value: string, x: number, width: number}>) {
+    for (const field of fields) {
+      // Draw border
+      page.drawRectangle({
+        x: field.x,
+        y: y - 15,
+        width: field.width,
+        height: 25,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 1,
+      });
+      
+      // Draw label (smaller, top part)
+      page.drawText(field.label, {
+        x: field.x + 5,
+        y: y + 5,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw value (larger, bottom part)
+      page.drawText(field.value, {
+        x: field.x + 5,
+        y: y - 8,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+        maxWidth: field.width - 10,
+      });
     }
   }
 }
