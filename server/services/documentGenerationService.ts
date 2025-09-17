@@ -60,199 +60,133 @@ export class DocumentGenerationService {
   private async fillPDFWithTextReplacement(templateBytes: Uint8Array, fieldMappings: Record<string, string>): Promise<Buffer> {
     try {
       console.log('Implementing text-based template filling...');
-      console.log('Field mappings:', Object.keys(fieldMappings));
+      console.log('Field mappings:', fieldMappings);
       
-      // Create a new PDF document with the filled template
+      // Load the original template
+      const templateDoc = await PDFDocument.load(templateBytes);
+      
+      // Extract text content from the template
+      let templateText = '';
+      try {
+        const pages = templateDoc.getPages();
+        
+        // For now, we'll handle this by creating a new document based on the template structure
+        // and replace placeholders. This is a simplified approach that preserves the layout concept
+        templateText = await this.extractTextFromPDF(templateBytes);
+        console.log('Extracted template text:', templateText);
+      } catch (error) {
+        console.warn('Could not extract text from template, using fallback approach');
+      }
+      
+      // Replace placeholders in the template text
+      let filledText = templateText;
+      for (const [fieldName, value] of Object.entries(fieldMappings)) {
+        // Replace both {{field_name}} and {field_name} patterns
+        const placeholderPatterns = [
+          new RegExp(`\\{\\{${fieldName}\\}\\}`, 'gi'),
+          new RegExp(`\\{${fieldName}\\}`, 'gi')
+        ];
+        
+        for (const pattern of placeholderPatterns) {
+          filledText = filledText.replace(pattern, value || 'N/A');
+        }
+      }
+      
+      // Create a new PDF with the filled content
+      return await this.createFilledPDF(templateDoc, fieldMappings);
+      
+    } catch (error) {
+      console.error('Text replacement failed:', error);
+      throw error;
+    }
+  }
+
+  private async extractTextFromPDF(pdfBytes: Uint8Array): Promise<string> {
+    // This is a simplified text extraction
+    // In a production environment, you might want to use a more sophisticated PDF text extraction library
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pages = pdfDoc.getPages();
+      let text = '';
+      
+      // For this implementation, we'll return a placeholder that represents the template structure
+      // This would need to be enhanced with actual PDF text extraction capabilities
+      return text;
+    } catch (error) {
+      console.warn('Text extraction failed:', error);
+      return '';
+    }
+  }
+
+  private async createFilledPDF(templateDoc: PDFDocument, fieldMappings: Record<string, string>): Promise<Buffer> {
+    try {
+      // Create a new PDF document that mimics the template structure
       const pdfDoc = await PDFDocument.create();
       
-      // Create the filled certificate page
-      const page = pdfDoc.addPage([612, 792]); // Standard letter size
-      const { width, height } = page.getSize();
+      // Copy pages from template to preserve layout
+      const templatePages = templateDoc.getPages();
+      const copiedPages = await pdfDoc.copyPages(templateDoc, Array.from({length: templatePages.length}, (_, i) => i));
       
-      // Title
-      page.drawText('NATIONAL CIVIL REGISTRY', {
-        x: width / 2 - 100,
-        y: height - 50,
-        size: 16,
-        color: rgb(0, 0, 0),
+      copiedPages.forEach(page => {
+        pdfDoc.addPage(page);
       });
       
-      page.drawText('DIGITAL CIVIL STATUS REGISTRATION', {
-        x: width / 2 - 130,
-        y: height - 80,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
+      // Now we need to overlay text on the copied pages to replace placeholders
+      const pages = pdfDoc.getPages();
       
-      let yPos = height - 120;
-      
-      // Serial Indicator
-      page.drawText(`Serial Indicator: ${fieldMappings.serial_indicator || 'N/A'}`, {
-        x: 50,
-        y: yPos,
-        size: 12,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 30;
-      
-      // Registry Office Information
-      page.drawText('Registry Office Information', {
-        x: 50,
-        y: yPos,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 25;
-      
-      const registryFields = [
-        ['Country', fieldMappings.registry_country || 'N/A'],
-        ['Department', fieldMappings.registry_department || 'N/A'], 
-        ['Municipality', fieldMappings.registry_municipality || 'N/A'],
-        ['Date of Registration', fieldMappings.registry_date_of_registration || 'N/A'],
-        ['Office Type', fieldMappings.registry_office_type || 'N/A'],
-        ['Office Name/Number', fieldMappings.registry_office_name || 'N/A']
-      ];
-      
-      for (const [label, value] of registryFields) {
-        page.drawText(`${label}: ${value}`, {
-          x: 70,
-          y: yPos,
-          size: 11,
-          color: rgb(0, 0, 0),
-        });
-        yPos -= 20;
+      if (pages.length > 0) {
+        const page = pages[0];
+        
+        // Define positions for different fields based on the template structure
+        const fieldPositions: Record<string, {x: number, y: number, size: number}> = {
+          'serial_indicator': { x: 350, y: 730, size: 10 },
+          'qr_code': { x: 500, y: 730, size: 10 },
+          'registry_country': { x: 106, y: 642, size: 10 },
+          'registry_department': { x: 347, y: 642, size: 10 },
+          'registry_municipality': { x: 573, y: 642, size: 10 },
+          'registry_date_of_registration': { x: 830, y: 642, size: 10 },
+          'registry_office_type': { x: 480, y: 611, size: 10 },
+          'marriage_country': { x: 112, y: 527, size: 10 },
+          'marriage_department': { x: 353, y: 527, size: 10 },
+          'marriage_municipality': { x: 579, y: 527, size: 10 },
+          'marriage_date_of_registration': { x: 836, y: 527, size: 10 },
+          'marriage_type': { x: 480, y: 496, size: 10 },
+          'party_a_names': { x: 104, y: 437, size: 10 },
+          'party_a_surnames': { x: 566, y: 437, size: 10 },
+          'party_a_document_type': { x: 138, y: 406, size: 10 },
+          'party_a_document_number': { x: 601, y: 406, size: 10 },
+          'party_b_names': { x: 104, y: 362, size: 10 },
+          'party_b_surnames': { x: 566, y: 362, size: 10 },
+          'party_b_document_type': { x: 138, y: 331, size: 10 },
+          'party_b_document_number': { x: 601, y: 331, size: 10 }
+        };
+        
+        // Draw field values at their designated positions
+        for (const [fieldName, value] of Object.entries(fieldMappings)) {
+          const position = fieldPositions[fieldName];
+          if (position && value) {
+            // Draw white rectangle to cover placeholder text
+            page.drawRectangle({
+              x: position.x - 2,
+              y: position.y - 2,
+              width: 150,
+              height: 14,
+              color: rgb(1, 1, 1), // White color to cover existing text
+            });
+            
+            // Draw the actual value
+            page.drawText(value, {
+              x: position.x,
+              y: position.y,
+              size: position.size,
+              color: rgb(0, 0, 0), // Black text
+            });
+          }
+        }
       }
       
-      yPos -= 20;
-      
-      // Marriage Information  
-      page.drawText('Marriage Information', {
-        x: 50,
-        y: yPos,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 25;
-      
-      const marriageFields = [
-        ['Country', fieldMappings.marriage_country || 'N/A'],
-        ['Department', fieldMappings.marriage_department || 'N/A'],
-        ['Municipality', fieldMappings.marriage_municipality || 'N/A'], 
-        ['Date of Registration', fieldMappings.marriage_date_of_registration || 'N/A'],
-        ['Marriage Type', fieldMappings.marriage_type || 'N/A']
-      ];
-      
-      for (const [label, value] of marriageFields) {
-        page.drawText(`${label}: ${value}`, {
-          x: 70,
-          y: yPos,
-          size: 11,
-          color: rgb(0, 0, 0),
-        });
-        yPos -= 20;
-      }
-      
-      yPos -= 20;
-      
-      // Party A
-      page.drawText('Party to the Marriage — A', {
-        x: 50,
-        y: yPos,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 25;
-      
-      const partyAFields = [
-        ['Names', fieldMappings.party_a_names || 'N/A'],
-        ['Surnames', fieldMappings.party_a_surnames || 'N/A'],
-        ['Document Type', fieldMappings.party_a_document_type || 'N/A'],
-        ['Document Number', fieldMappings.party_a_document_number || 'N/A']
-      ];
-      
-      for (const [label, value] of partyAFields) {
-        page.drawText(`${label}: ${value}`, {
-          x: 70,
-          y: yPos,
-          size: 11,
-          color: rgb(0, 0, 0),
-        });
-        yPos -= 20;
-      }
-      
-      yPos -= 20;
-      
-      // Party B
-      page.drawText('Party to the Marriage — B', {
-        x: 50,
-        y: yPos,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 25;
-      
-      const partyBFields = [
-        ['Names', fieldMappings.party_b_names || 'N/A'],
-        ['Surnames', fieldMappings.party_b_surnames || 'N/A'],
-        ['Document Type', fieldMappings.party_b_document_type || 'N/A'],
-        ['Document Number', fieldMappings.party_b_document_number || 'N/A']
-      ];
-      
-      for (const [label, value] of partyBFields) {
-        page.drawText(`${label}: ${value}`, {
-          x: 70,
-          y: yPos,
-          size: 11,
-          color: rgb(0, 0, 0),
-        });
-        yPos -= 20;
-      }
-      
-      yPos -= 20;
-      
-      // Date of Issue
-      page.drawText('Date of Issue', {
-        x: 50,
-        y: yPos,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 25;
-      
-      page.drawText(`Day: ${fieldMappings.issue_day || 'N/A'}  Month: ${fieldMappings.issue_month || 'N/A'}  Year: ${fieldMappings.issue_year || 'N/A'}`, {
-        x: 70,
-        y: yPos,
-        size: 11,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 40;
-      
-      // Authorized Signature
-      page.drawText('Authorized Signature', {
-        x: 50,
-        y: yPos,
-        size: 14,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 25;
-      
-      page.drawText(`Name: ${fieldMappings.authorized_name || 'N/A'}`, {
-        x: 70,
-        y: yPos,
-        size: 11,
-        color: rgb(0, 0, 0),
-      });
-      yPos -= 20;
-      
-      page.drawText(`Title: ${fieldMappings.authorized_title || 'N/A'}`, {
-        x: 70,
-        y: yPos,
-        size: 11,
-        color: rgb(0, 0, 0),
-      });
-      
+      // Save the PDF
       const filledPdfBytes = await pdfDoc.save();
-      console.log('Successfully created filled PDF template');
       return Buffer.from(filledPdfBytes);
     } catch (error) {
       console.error('Text replacement failed:', error);
