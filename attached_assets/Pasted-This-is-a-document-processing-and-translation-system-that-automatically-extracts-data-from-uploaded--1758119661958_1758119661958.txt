@@ -1,0 +1,55 @@
+This is a document processing and translation system that automatically extracts data from uploaded documents (like marriage certificates, birth certificates, etc.) and fills out template forms with the extracted information.
+🔄 How It Works
+1. Document Upload & Processing
+Users upload documents (PDFs, images) containing form data
+The system uses Google Vision API for OCR text extraction
+Extracts text from scanned documents, even handwritten forms
+2. Smart Field Extraction
+Dynamically analyzes any document type (not hardcoded for specific forms)
+Finds common fields like:
+👤 Personal Info: Names, surnames, document numbers
+📅 Dates: Birth dates, marriage dates, registration dates
+🌍 Locations: Countries, states, cities, addresses
+🏛️ Official Info: Titles, professions, authorities
+�� Contact: Phone numbers, emails
+3. Template System
+Users can upload custom PDF/DOCX templates with placeholders like {{party_a_names}}
+Templates are stored in Supabase database
+System automatically maps extracted fields to template placeholders
+4. Document Generation
+Creates filled-out documents using the uploaded templates
+Replaces placeholders with actual extracted data
+Generates both DOCX and PDF versions
+Downloads are provided via secure signed URLs
+🛠️ Technical Features
+Frontend (React + TypeScript)
+📤 File Upload: Drag & drop document upload
+📋 Template Selection: Choose from uploaded templates
+🔍 Real-time Debug: Shows extraction process with detailed logs
+📊 Progress Tracking: Step-by-step processing status
+💾 Download Results: Get processed documents
+Backend (Supabase Edge Functions)
+🔍 OCR Processing: Google Vision API integration
+�� AI Field Extraction: Pattern matching and key-value pair detection
+📄 Template Filling: DOCX template processing with Docxtemplater
+📤 File Storage: Supabase storage for templates and results
+🔐 Authentication: Service account OAuth2 for Google APIs
+Database (Supabase)
+📁 Templates Table: Stores uploaded template files and metadata
+🏢 Logos Table: Manages organization logos and branding
+📊 Processing Jobs: Tracks document processing status
+🔗 File URLs: Secure signed URLs for downloads
+�� Use Cases
+Government/Registry Offices
+Process marriage certificates, birth certificates
+Extract data from handwritten forms
+Generate standardized official documents
+Legal/Translation Services
+Translate documents while preserving structure
+Extract key information from foreign documents
+Generate translated versions with proper formatting
+Business Applications
+Process invoices, contracts, forms
+Extract data for database entry
+Standardize document formats
+🌟 Key Be
