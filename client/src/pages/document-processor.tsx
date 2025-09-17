@@ -228,13 +228,62 @@ export default function DocumentProcessor() {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
         <div className="space-y-8">
+          
+          {/* Template Selection */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-template-selection">
+            <CardContent className="p-8">
+              <div className="mb-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">1. Choose Template</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Select the template you want to fill with extracted data</p>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="template-select" className="text-sm font-medium text-gray-900 dark:text-white">Template</Label>
+                  <select
+                    id="template-select"
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    data-testid="select-template"
+                  >
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {selectedTemplate && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {selectedTemplate.description || 'No description'}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {selectedTemplate.fields.length} fields required
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-center">
+                  <Link href="/admin/templates">
+                    <Button variant="outline" size="sm">
+                      Manage Templates
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
             
           {/* Document Upload */}
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-document-upload">
             <CardContent className="p-8">
               <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">1. Upload Document</h2>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Upload the document you want to extract data from</p>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">2. Upload Document</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Upload the document to extract data for your selected template</p>
               </div>
               
               <ObjectUploader
@@ -275,7 +324,7 @@ export default function DocumentProcessor() {
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-processing-status">
             <CardContent className="p-8">
               <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">2. Processing Status</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">3. Processing Status</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">AI-powered extraction and document processing</p>
               </div>
               
@@ -317,7 +366,7 @@ export default function DocumentProcessor() {
             <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-extracted-data">
               <CardContent className="p-8">
                 <div className="mb-6">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">3. Extracted Data</h2>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">4. Extracted Data</h2>
                   <p className="text-gray-600 dark:text-gray-400 text-sm">Review and edit the extracted fields</p>
                 </div>
                   
@@ -365,57 +414,26 @@ export default function DocumentProcessor() {
               </Card>
             )}
           
-          {/* Template Selection */}
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-template-selection">
-            <CardContent className="p-8">
-              <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">4. Choose Template</h2>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Select a template to fill with extracted data</p>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="template-select" className="text-sm font-medium text-gray-900 dark:text-white">Template</Label>
-                  <select
-                    id="template-select"
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    data-testid="select-template"
-                  >
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
+          {/* Generate Document */}
+          {currentJob?.status === 'completed' && (
+            <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-document-generation">
+              <CardContent className="p-8">
+                <div className="mb-6">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">5. Generate Document</h2>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">Create the filled document using your template</p>
                 </div>
                 
-                {selectedTemplate && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {selectedTemplate.description || 'No description'}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {selectedTemplate.fields.length} fields
-                    </div>
-                  </div>
-                )}
-                
-                {currentJob?.status === 'completed' && (
-                  <Button 
-                    onClick={() => generateDocumentMutation.mutate(currentJob.id)}
-                    disabled={generateDocumentMutation.isPending}
-                    className="w-full"
-                    data-testid="button-generate-document"
-                  >
-                    {generateDocumentMutation.isPending ? 'Generating...' : 'Generate Document'}
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                <Button 
+                  onClick={() => generateDocumentMutation.mutate(currentJob.id)}
+                  disabled={generateDocumentMutation.isPending}
+                  className="w-full"
+                  data-testid="button-generate-document"
+                >
+                  {generateDocumentMutation.isPending ? 'Generating...' : 'Generate Document'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
