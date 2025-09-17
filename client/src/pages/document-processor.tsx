@@ -199,315 +199,188 @@ export default function DocumentProcessor() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-slate-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-gray-700/50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <FileText className="text-white text-xl" data-testid="logo-icon" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent" data-testid="app-title">
-                    Document Processor
-                  </h1>
-                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">AI-Powered Document Extraction</p>
-                </div>
-              </div>
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <FileText className="h-6 w-6 text-gray-700 dark:text-gray-300" data-testid="logo-icon" />
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white" data-testid="app-title">
+                Document Processor
+              </h1>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <Link href="/">
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
-                  <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                   Home
                 </Button>
               </Link>
               <Link href="/admin/templates">
-                <Button variant="outline" size="sm" className="border-blue-200 hover:bg-blue-50 dark:border-blue-800 dark:hover:bg-blue-950" data-testid="button-admin">
-                  <Settings className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" data-testid="button-admin">
                   Template Admin
                 </Button>
               </Link>
-              <Button variant="ghost" size="sm" data-testid="button-help">
-                <HelpCircle className="h-4 w-4" />
-              </Button>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center shadow-lg" data-testid="user-avatar">
-                <User className="h-5 w-5" />
-              </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Left Column: Document Upload & Processing */}
-          <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <div className="space-y-8">
             
-            {/* Document Upload */}
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-document-upload">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                      <Upload className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Document Upload</h2>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-700 dark:text-green-300">Step 1 of 3</span>
-                  </div>
+          {/* Document Upload */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-document-upload">
+            <CardContent className="p-8">
+              <div className="mb-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">1. Upload Document</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Upload the document you want to extract data from</p>
+              </div>
+              
+              <ObjectUploader
+                maxNumberOfFiles={1}
+                maxFileSize={10485760} // 10MB
+                onGetUploadParameters={handleGetUploadParameters}
+                onComplete={handleUploadComplete}
+                buttonClassName="w-full"
+              >
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors" data-testid="upload-zone">
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Drop files here or click to browse</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">PDF, Images, or DOCX files up to 10MB</p>
                 </div>
-                
-                <div className="space-y-4">
-                  <ObjectUploader
-                    maxNumberOfFiles={1}
-                    maxFileSize={10485760} // 10MB
-                    onGetUploadParameters={handleGetUploadParameters}
-                    onComplete={handleUploadComplete}
-                    buttonClassName="w-full"
-                  >
-                    <div className="upload-zone relative border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-xl p-12 text-center cursor-pointer transition-all duration-300 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 group" data-testid="upload-zone">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="relative z-10">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-transform duration-300">
-                          <Upload className="h-10 w-10 text-white" />
-                        </div>
-                        <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">Drop your documents here</h3>
-                        <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">or click to browse files from your computer</p>
-                        <div className="flex justify-center space-x-6 text-sm">
-                          <div className="flex items-center space-x-2 bg-red-50 dark:bg-red-900/30 px-4 py-2 rounded-full">
-                            <FileText className="h-5 w-5 text-red-500" />
-                            <span className="font-medium text-red-700 dark:text-red-300">PDF</span>
-                          </div>
-                          <div className="flex items-center space-x-2 bg-blue-50 dark:bg-blue-900/30 px-4 py-2 rounded-full">
-                            <FileIcon className="h-5 w-5 text-blue-500" />
-                            <span className="font-medium text-blue-700 dark:text-blue-300">Images</span>
-                          </div>
-                          <div className="flex items-center space-x-2 bg-green-50 dark:bg-green-900/30 px-4 py-2 rounded-full">
-                            <FileText className="h-5 w-5 text-green-500" />
-                            <span className="font-medium text-green-700 dark:text-green-300">DOCX</span>
-                          </div>
-                        </div>
-                        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                          Maximum file size: 10MB
+              </ObjectUploader>
+                  
+              {/* Uploaded Files */}
+              {uploadedFiles.length > 0 && (
+                <div className="mt-6 space-y-3" data-testid="uploaded-files">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center space-x-3">
+                        <FileText className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white" data-testid={`file-name-${index}`}>{file.name}</span>
+                          <div className="text-xs text-gray-500 dark:text-gray-400" data-testid={`file-size-${index}`}>{file.size}</div>
                         </div>
                       </div>
+                      <div className="text-xs text-green-600 font-medium">{file.status}</div>
                     </div>
-                  </ObjectUploader>
+                  ))}
+                </div>
+              )}
+              </CardContent>
+            </Card>
+
+          {/* Processing Status */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-processing-status">
+            <CardContent className="p-8">
+              <div className="mb-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">2. Processing Status</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">AI-powered extraction and document processing</p>
+              </div>
+              
+              {currentJob ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">Overall Progress</span>
+                    <span className="text-sm text-gray-500">{Math.round(getProgressPercentage(currentJob.status))}%</span>
+                  </div>
+                  <Progress value={getProgressPercentage(currentJob.status)} className="h-2" data-testid="progress-overall" />
                   
-                  {/* Uploaded Files */}
-                  {uploadedFiles.length > 0 && (
-                    <div className="space-y-2" data-testid="uploaded-files">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <FileText className="h-5 w-5 text-red-500" />
-                            <span className="text-sm font-medium" data-testid={`file-name-${index}`}>{file.name}</span>
-                            <span className="text-xs text-muted-foreground" data-testid={`file-size-${index}`}>{file.size}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">{file.status}</span>
-                            <Button variant="ghost" size="sm" data-testid={`button-remove-${index}`}>
-                              <AlertCircle className="h-4 w-4" />
-                            </Button>
-                          </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Current step: <span className="font-medium">{statusSteps.find(s => s.key === currentJob.status)?.label || currentJob.status}</span>
+                  </div>
+
+                  {currentJob.status === 'error' && currentJob.errorMessage && (
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" data-testid="error-message">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                        <div className="text-sm text-red-800 dark:text-red-200">
+                          <div className="font-medium">Processing Error</div>
+                          <div className="mt-1">{currentJob.errorMessage}</div>
                         </div>
-                      ))}
+                      </div>
                     </div>
                   )}
                 </div>
+              ) : (
+                <div className="text-center py-8" data-testid="no-active-job">
+                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">No document processing in progress</p>
+                </div>
+              )}
               </CardContent>
             </Card>
 
-            {/* Processing Status */}
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-processing-status">
+          {/* Extracted Data */}
+          {currentJob?.extractedData && (
+            <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-extracted-data">
               <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                      <Settings className="h-4 w-4 text-white" />
+                <div className="mb-6">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">3. Extracted Data</h2>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">Review and edit the extracted fields</p>
+                </div>
+                  
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(currentJob.extractedData)
+                    .slice(0, showAllFields ? undefined : 6)
+                    .map(([field, value]) => (
+                    <div key={field} className="space-y-2">
+                      <Label htmlFor={field} className="text-sm font-medium text-gray-900 dark:text-white">
+                        {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Label>
+                      <Input
+                        id={field}
+                        value={value}
+                        onChange={(e) => handleExtractedDataChange(field, e.target.value)}
+                        className="w-full"
+                        data-testid={`input-${field}`}
+                      />
                     </div>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Processing Status</h2>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Step 2 of 3</span>
-                  </div>
+                  ))}
                 </div>
                 
-                {currentJob ? (
-                  <div className="space-y-4">
-                    {/* Overall Progress */}
-                    <div className="mb-6">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">Overall Progress</span>
-                        <span className="text-sm text-muted-foreground">{Math.round(getProgressPercentage(currentJob.status))}%</span>
-                      </div>
-                      <Progress value={getProgressPercentage(currentJob.status)} className="h-2" data-testid="progress-overall" />
-                    </div>
-
-                    {/* Status Steps */}
-                    {statusSteps.slice(0, -1).map((step) => {
-                      const { icon: IconComponent, color, bg } = getStatusDisplay(step, currentJob.status);
-                      const isActive = step.key === currentJob.status;
-                      
-                      return (
-                        <div key={step.key} className="flex items-center space-x-4" data-testid={`status-${step.key}`}>
-                          <div className={`w-8 h-8 rounded-full ${bg} ${color} flex items-center justify-center ${isActive ? 'pulse-animation' : ''}`}>
-                            <IconComponent className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">{step.label}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {currentJob.status === step.key ? 'Processing...' : 
-                                 statusSteps.findIndex(s => s.key === currentJob.status) > statusSteps.findIndex(s => s.key === step.key) ? 'Completed' : 'Pending'}
-                              </span>
-                            </div>
-                            <div className="w-full bg-secondary rounded-full h-2 mt-1">
-                              <div 
-                                className={`h-2 rounded-full progress-bar ${
-                                  currentJob.status === step.key ? 'bg-blue-600' :
-                                  statusSteps.findIndex(s => s.key === currentJob.status) > statusSteps.findIndex(s => s.key === step.key) ? 'bg-green-600' : 'bg-muted'
-                                }`}
-                                style={{
-                                  width: currentJob.status === step.key ? '65%' :
-                                         statusSteps.findIndex(s => s.key === currentJob.status) > statusSteps.findIndex(s => s.key === step.key) ? '100%' : '0%'
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
+                <div className="flex justify-between mt-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowAllFields(!showAllFields)}
+                    data-testid="button-show-all-fields"
+                  >
+                    {showAllFields 
+                      ? `Show Less (${Object.keys(currentJob.extractedData).length > 6 ? '6' : Object.keys(currentJob.extractedData).length})` 
+                      : `Show All Fields (${Object.keys(currentJob.extractedData).length})`
+                    }
+                  </Button>
+                  <Button 
+                    onClick={() => updateJobMutation.mutate({ 
+                      jobId: currentJob.id, 
+                      updates: { templateId: selectedTemplateId }
                     })}
-
-                    {/* Error Display */}
-                    {currentJob.status === 'error' && currentJob.errorMessage && (
-                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg" data-testid="error-message">
-                        <div className="flex items-start space-x-2">
-                          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                          <div className="text-sm text-red-800">
-                            <div className="font-medium">Processing Error</div>
-                            <div className="mt-1">{currentJob.errorMessage}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Debug Information */}
-                    <div className="mt-6 p-4 bg-muted rounded-lg" data-testid="debug-log">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">Debug Log</span>
-                        <Button variant="link" size="sm" className="text-xs">Clear Log</Button>
-                      </div>
-                      <div className="text-xs font-mono text-muted-foreground space-y-1">
-                        <div>[{new Date().toLocaleTimeString()}] Job created: {currentJob.id}</div>
-                        <div>[{new Date().toLocaleTimeString()}] Status: {currentJob.status}</div>
-                        {currentJob.extractedData && (
-                          <div>[{new Date().toLocaleTimeString()}] Extracted {Object.keys(currentJob.extractedData).length} fields</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-12" data-testid="no-active-job">
-                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <Clock className="h-12 w-12 text-gray-500 dark:text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No document processing in progress</h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm max-w-md mx-auto">Upload a document above to start the AI-powered extraction and processing workflow.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Extracted Data */}
-            {currentJob?.extractedData && (
-              <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-extracted-data">
-                <CardContent className="p-8">
-                  <div className="flex items-center space-x-3 mb-6">
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Extracted Data</h2>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(currentJob.extractedData)
-                      .slice(0, showAllFields ? undefined : 6)
-                      .map(([field, value]) => (
-                      <div key={field} className="space-y-2">
-                        <Label htmlFor={field} className="text-sm font-medium text-foreground">
-                          {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </Label>
-                        <Input
-                          id={field}
-                          value={value}
-                          onChange={(e) => handleExtractedDataChange(field, e.target.value)}
-                          className="w-full"
-                          data-testid={`input-${field}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex justify-between mt-6">
-                    <Button 
-                      variant="secondary" 
-                      onClick={() => setShowAllFields(!showAllFields)}
-                      data-testid="button-show-all-fields"
-                    >
-                      {showAllFields 
-                        ? `Show Less (${Object.keys(currentJob.extractedData).length > 6 ? '6' : Object.keys(currentJob.extractedData).length})` 
-                        : `Show All Fields (${Object.keys(currentJob.extractedData).length})`
-                      }
-                    </Button>
-                    <Button 
-                      onClick={() => updateJobMutation.mutate({ 
-                        jobId: currentJob.id, 
-                        updates: { templateId: selectedTemplateId }
-                      })}
-                      data-testid="button-proceed-template"
-                    >
-                      Proceed to Template
-                    </Button>
-                  </div>
+                    data-testid="button-proceed-template"
+                  >
+                    Continue to Template
+                  </Button>
+                </div>
                 </CardContent>
               </Card>
             )}
-          </div>
           
-          {/* Right Column: Template Management & Results */}
-          <div className="space-y-6">
-            
-            {/* Template Selection */}
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl" data-testid="card-template-selection">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                      <FileText className="h-4 w-4 text-white" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Template Selection</h2>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-orange-100 dark:bg-orange-900/30 px-3 py-1 rounded-full">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Step 3 of 3</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <Label htmlFor="template-select">Choose Template</Label>
+          {/* Template Selection */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-template-selection">
+            <CardContent className="p-8">
+              <div className="mb-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">4. Choose Template</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Select a template to fill with extracted data</p>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="template-select" className="text-sm font-medium text-gray-900 dark:text-white">Template</Label>
                   <select
                     id="template-select"
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                    className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     data-testid="select-template"
                   >
                     {templates.map((template) => (
@@ -516,189 +389,33 @@ export default function DocumentProcessor() {
                       </option>
                     ))}
                   </select>
-                  
-                  {selectedTemplate && (
-                    <div className="mt-3 p-3 bg-secondary rounded-lg">
-                      <div className="text-sm font-medium text-foreground">{selectedTemplate.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {selectedTemplate.description || 'No description'}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {selectedTemplate.fields.length} fields
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Field Mapping */}
-            {currentJob?.fieldMappings && selectedTemplate && (
-              <Card data-testid="card-field-mapping">
-                <CardContent className="p-6">
-                  <h2 className="text-lg font-semibold text-foreground mb-4">Field Mapping</h2>
-                  
-                  <div className="space-y-3">
-                    {selectedTemplate.fields.slice(0, 3).map((templateField) => {
-                      const mappedValue = currentJob.fieldMappings?.[templateField];
-                      const hasMapping = !!mappedValue;
-                      
-                      return (
-                        <div key={templateField} className={`flex items-center justify-between p-3 rounded-lg ${
-                          hasMapping ? 'bg-secondary' : 'bg-yellow-50 border border-yellow-200'
-                        }`} data-testid={`mapping-${templateField}`}>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-foreground">{`{{${templateField}}}`}</div>
-                            <div className="text-xs text-muted-foreground">Template field</div>
-                          </div>
-                          <div className="mx-3">
-                            {hasMapping ? (
-                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <TriangleAlert className="h-4 w-4 text-yellow-600" />
-                            )}
-                          </div>
-                          <div className="flex-1 text-right">
-                            <div className={`text-sm font-medium ${hasMapping ? 'text-foreground' : 'text-yellow-700'}`}>
-                              {mappedValue || 'No match found'}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {hasMapping ? 'Extracted value' : 'Needs manual input'}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg" data-testid="mapping-status">
-                    <div className="flex items-start space-x-2">
-                      <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-                      <div className="text-sm text-blue-800">
-                        <div className="font-medium">Mapping Status</div>
-                        <div className="text-xs mt-1">
-                          {Object.keys(currentJob.fieldMappings || {}).length} of {selectedTemplate.fields.length} fields mapped automatically
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Document Generation */}
-            {currentJob && currentJob.status === 'completed' && (
-              <Card data-testid="card-document-generation">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-foreground">Generated Documents</h2>
-                    <span className="text-sm text-muted-foreground">Step 3 of 3</span>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <Button 
-                      className="w-full" 
-                      onClick={() => generateDocumentMutation.mutate(currentJob.id)}
-                      disabled={generateDocumentMutation.isPending}
-                      data-testid="button-generate-document"
-                    >
-                      {generateDocumentMutation.isPending ? (
-                        <>
-                          <Clock className="h-4 w-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Generate Document
-                        </>
-                      )}
-                    </Button>
-                    
-                    {currentJob.generatedDocumentPath && (
-                      <div className="border border-border rounded-lg p-4 fade-in" data-testid="generated-document">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <FileText className="h-5 w-5 text-red-500" />
-                            <div>
-                              <div className="text-sm font-medium text-foreground">generated_document.pdf</div>
-                              <div className="text-xs text-muted-foreground">Generated just now</div>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm" data-testid="button-download-document">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Complete</span>
-                          <span className="text-xs text-muted-foreground">PDF format</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Recent Activity */}
-            <Card data-testid="card-recent-activity">
-              <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h2>
-                
-                <div className="space-y-3">
-                  {jobsLoading ? (
-                    <div className="text-center text-muted-foreground py-4">Loading activity...</div>
-                  ) : processingJobs.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      <Clock className="mx-auto h-12 w-12 mb-4" />
-                      <p>No processing history yet.</p>
-                      <p className="text-sm">Your processed documents will appear here.</p>
-                    </div>
-                  ) : (
-                    processingJobs.slice(0, 5).map((job) => (
-                      <div 
-                        key={job.id} 
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent transition-colors cursor-pointer"
-                        onClick={() => setCurrentJobId(job.id)}
-                        data-testid={`activity-job-${job.id}`}
-                      >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${
-                          job.status === 'completed' ? 'bg-green-100 text-green-600' :
-                          job.status === 'error' ? 'bg-red-100 text-red-600' :
-                          'bg-blue-100 text-blue-600'
-                        }`}>
-                          {job.status === 'completed' ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : job.status === 'error' ? (
-                            <AlertCircle className="h-4 w-4" />
-                          ) : (
-                            <Clock className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-foreground truncate">
-                            Processing Job {job.id.slice(0, 8)}...
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(job.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
                 </div>
                 
-                {processingJobs.length > 5 && (
-                  <Button variant="link" className="w-full mt-4" data-testid="button-view-all-history">
-                    View All History
+                {selectedTemplate && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {selectedTemplate.description || 'No description'}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {selectedTemplate.fields.length} fields
+                    </div>
+                  </div>
+                )}
+                
+                {currentJob?.status === 'completed' && (
+                  <Button 
+                    onClick={() => generateDocumentMutation.mutate(currentJob.id)}
+                    disabled={generateDocumentMutation.isPending}
+                    className="w-full"
+                    data-testid="button-generate-document"
+                  >
+                    {generateDocumentMutation.isPending ? 'Generating...' : 'Generate Document'}
                   </Button>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
