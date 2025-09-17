@@ -351,8 +351,8 @@ export class OCRService {
     try {
       console.log('Processing PDF using direct text extraction...');
       
-      // Load the PDF document from buffer
-      const loadingTask = pdfjsLib.getDocument(fileBuffer);
+      // Load the PDF document from buffer (convert Buffer to Uint8Array)
+      const loadingTask = pdfjsLib.getDocument(new Uint8Array(fileBuffer));
       const pdfDocument = await loadingTask.promise;
       
       console.log(`PDF loaded with ${pdfDocument.numPages} pages`);
