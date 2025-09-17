@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import { FileText, Upload, Clock, CheckCircle, AlertCircle, Download, Settings, HelpCircle, User, Plus, FileIcon, ArrowRight, TriangleAlert, Info } from "lucide-react";
+import { FileText, Upload, Clock, CheckCircle, AlertCircle, Download, Settings, HelpCircle, User, FileIcon, ArrowRight, TriangleAlert, Info } from "lucide-react";
+import { Link } from "wouter";
 import type { UploadResult } from "@uppy/core";
 
 interface Template {
@@ -47,12 +48,6 @@ const statusSteps = [
 export default function DocumentProcessor() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('default-marriage-cert');
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [templateForm, setTemplateForm] = useState({
-    name: '',
-    description: '',
-    fields: [] as string[]
-  });
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; status: string }>>([]);
   const [showAllFields, setShowAllFields] = useState(false);
 
@@ -217,9 +212,12 @@ export default function DocumentProcessor() {
               <span className="text-sm text-muted-foreground">AI-Powered Document Extraction</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" data-testid="button-settings">
-                <Settings className="h-4 w-4" />
-              </Button>
+              <Link href="/admin/templates">
+                <Button variant="outline" size="sm" data-testid="button-admin">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Template Admin
+                </Button>
+              </Link>
               <Button variant="ghost" size="sm" data-testid="button-help">
                 <HelpCircle className="h-4 w-4" />
               </Button>
@@ -439,102 +437,41 @@ export default function DocumentProcessor() {
             <Card data-testid="card-template-selection">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-foreground">Templates</h2>
-                  <Dialog open={isTemplateModalOpen} onOpenChange={setIsTemplateModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="link" size="sm" data-testid="button-add-template">
-                        <Plus className="h-4 w-4 mr-1" />Add Template
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent data-testid="dialog-template-upload">
-                      <DialogHeader>
-                        <DialogTitle>Upload Template</DialogTitle>
-                        <DialogDescription>
-                          Upload a new PDF or DOCX template with placeholders.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="templateName">Template Name</Label>
-                          <Input
-                            id="templateName"
-                            placeholder="e.g., Birth Certificate Template"
-                            value={templateForm.name}
-                            onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
-                            data-testid="input-template-name"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="templateDescription">Description</Label>
-                          <Textarea
-                            id="templateDescription"
-                            placeholder="Describe the template and its use case..."
-                            value={templateForm.description}
-                            onChange={(e) => setTemplateForm(prev => ({ ...prev, description: e.target.value }))}
-                            data-testid="textarea-template-description"
-                          />
-                        </div>
-                        <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                          <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Drop template file here or click to browse</p>
-                          <p className="text-xs text-muted-foreground mt-1">Supports PDF and DOCX files</p>
-                        </div>
-                        <div className="flex space-x-3">
-                          <Button 
-                            variant="outline" 
-                            className="flex-1" 
-                            onClick={() => setIsTemplateModalOpen(false)}
-                            data-testid="button-cancel-template"
-                          >
-                            Cancel
-                          </Button>
-                          <Button className="flex-1" data-testid="button-upload-template">
-                            Upload Template
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <h2 className="text-lg font-semibold text-foreground">Template Selection</h2>
+                  <Link href="/admin/templates">
+                    <Button variant="outline" size="sm" data-testid="button-manage-templates">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage Templates
+                    </Button>
+                  </Link>
                 </div>
                 
                 <div className="space-y-3">
-                  {templatesLoading ? (
-                    <div className="text-center text-muted-foreground py-4">Loading templates...</div>
-                  ) : templates.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      <FileText className="mx-auto h-12 w-12 mb-4" />
-                      <p>No templates available.</p>
-                      <p className="text-sm">Upload a template to get started.</p>
-                    </div>
-                  ) : (
-                    templates.map((template) => (
-                      <div 
-                        key={template.id} 
-                        className={`border border-border rounded-lg p-4 hover:bg-accent transition-colors cursor-pointer ${
-                          selectedTemplateId === template.id ? 'ring-2 ring-ring' : ''
-                        }`}
-                        onClick={() => setSelectedTemplateId(template.id)}
-                        data-testid={`template-${template.id}`}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className="w-12 h-16 bg-red-100 rounded border flex items-center justify-center">
-                            <FileText className="h-6 w-6 text-red-500" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-medium text-foreground truncate">{template.name}</h3>
-                            <p className="text-xs text-muted-foreground mt-1">{template.description || 'No description'}</p>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                selectedTemplateId === template.id ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {selectedTemplateId === template.id ? 'Active' : 'Available'}
-                              </span>
-                              <span className="text-xs text-muted-foreground">{template.fields.length} fields</span>
-                            </div>
-                          </div>
-                        </div>
+                  <Label htmlFor="template-select">Choose Template</Label>
+                  <select
+                    id="template-select"
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                    data-testid="select-template"
+                  >
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {selectedTemplate && (
+                    <div className="mt-3 p-3 bg-secondary rounded-lg">
+                      <div className="text-sm font-medium text-foreground">{selectedTemplate.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {selectedTemplate.description || 'No description'}
                       </div>
-                    ))
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {selectedTemplate.fields.length} fields
+                      </div>
+                    </div>
                   )}
                 </div>
               </CardContent>
