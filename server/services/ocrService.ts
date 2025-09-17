@@ -55,6 +55,24 @@ export class OCRService {
 
   async extractTextFromFile(filePath: string): Promise<string> {
     try {
+      // Check if filePath is a URL (signed URL from Google Cloud Storage)
+      if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        console.log('Downloading file from URL for OCR processing:', filePath.substring(0, 50) + '...');
+        
+        // Download the file content from the URL
+        const response = await fetch(filePath);
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        // Process the downloaded buffer
+        return await this.extractTextFromBuffer(buffer);
+      }
+      
+      // For local file paths or gs:// URIs, use direct file detection
       const [result] = await this.client.textDetection(filePath);
       const detections = result.textAnnotations;
       
