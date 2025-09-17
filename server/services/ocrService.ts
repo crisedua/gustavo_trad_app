@@ -33,9 +33,16 @@ export class OCRService {
         );
       }
 
-      // Set default project ID if not provided
+      // Require explicit project ID - no fallback
       if (!clientConfig.projectId) {
-        clientConfig.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || 'traduccion-471914';
+        if (process.env.GOOGLE_CLOUD_PROJECT_ID) {
+          clientConfig.projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+        } else {
+          throw new Error(
+            'Project ID not found. Please set GOOGLE_CLOUD_PROJECT_ID environment variable ' +
+            'or ensure your credentials JSON includes project_id field.'
+          );
+        }
       }
 
       this.client = new ImageAnnotatorClient(clientConfig);
