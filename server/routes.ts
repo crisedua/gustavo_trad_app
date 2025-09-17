@@ -629,11 +629,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update status to generation
       await storage.updateProcessingJob(job.id, { status: 'generation' });
 
-      // Generate the document
-      // For demo purposes, we'll create a simple PDF with the extracted data
-      // In production, you'd use the actual template file
-      const generatedPdfBuffer = await documentGenerationService.fillPDFTemplate(
-        template.filePath, 
+      // Generate the document using the new method that supports both manual and auto-created templates
+      const generatedPdfBuffer = await documentGenerationService.fillPDFTemplateWithTemplate(
+        template, 
         job.extractedFieldValues
       );
 
@@ -686,13 +684,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update status to extraction
       await storage.updateProcessingJob(jobId, { status: 'extraction' });
 
-      // Extract fields using AI
+      // Extract fields using AI with template context
       let extractedData: Record<string, string>;
       try {
         const template = job.templateId ? await storage.getTemplate(job.templateId) : null;
-        const templateFields = template ? Object.keys(template.fieldMappings) : [];
         
-        extractedData = await fieldExtractionService.extractFields(extractedText, templateFields);
+        if (template) {
+          // Use enhanced extraction for templates (both manual and auto-created)
+          extractedData = await fieldExtractionService.extractFieldsForTemplate(extractedText, template);
+        } else {
+          // Fallback to generic extraction
+          extractedData = await fieldExtractionService.extractFields(extractedText);
+        }
       } catch (error) {
         throw new Error(`Field extraction failed: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -703,20 +706,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedData 
       });
 
-      // Generate field mappings if template is selected
+      // Generate enhanced field mappings if template is selected
       let fieldMappings: Record<string, string> = {};
       if (job.templateId) {
         const template = await storage.getTemplate(job.templateId);
         if (template) {
           try {
-            fieldMappings = await fieldExtractionService.enhanceFieldMapping(
+            // Use enhanced field mapping for both manual and auto-created templates
+            fieldMappings = await fieldExtractionService.enhanceFieldMappingForTemplate(
               extractedData, 
-              Object.keys(template.fieldMappings)
+              template
             );
+            console.log(`Enhanced field mapping completed for ${template.isAutoCreated ? 'auto-created' : 'manual'} template`);
           } catch (error) {
-            console.error("Field mapping failed:", error);
-            // Continue with direct mapping
-            fieldMappings = extractedData;
+            console.error("Enhanced field mapping failed, using basic mapping:", error);
+            // Fallback to basic mapping
+            const templateFields = Object.keys(template.fieldMappings);
+            try {
+              fieldMappings = await fieldExtractionService.enhanceFieldMapping(
+                extractedData, 
+                templateFields
+              );
+            } catch (fallbackError) {
+              console.error("Basic field mapping also failed:", fallbackError);
+              // Final fallback to direct mapping
+              fieldMappings = extractedData;
+            }
           }
         }
       }

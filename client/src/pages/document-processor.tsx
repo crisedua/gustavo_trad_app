@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import { FileText, Upload, Clock, CheckCircle, AlertCircle, Download, Settings, HelpCircle, User, FileIcon, ArrowRight, TriangleAlert, Info } from "lucide-react";
+import { FileText, Upload, Clock, CheckCircle, AlertCircle, Download, Settings, HelpCircle, User, FileIcon, ArrowRight, TriangleAlert, Info, Zap, Target } from "lucide-react";
 import { Link } from "wouter";
 import type { UploadResult } from "@uppy/core";
 
@@ -255,20 +255,91 @@ export default function DocumentProcessor() {
                   >
                     {templates.map((template) => (
                       <option key={template.id} value={template.id}>
-                        {template.name}
+                        {template.isAutoCreated ? '🤖 ' : '📄 '}{template.name}
+                        {template.isAutoCreated ? ' (AI-Detected)' : ' (Manual)'}
                       </option>
                     ))}
                   </select>
                 </div>
                 
                 {selectedTemplate && selectedTemplate.fieldMappings && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
+                        {selectedTemplate.isAutoCreated ? (
+                          <div className="flex items-center space-x-1">
+                            <Zap className="h-3 w-3 text-green-600" />
+                            <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">AI-Detected</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">Manual</span>
+                        )}
+                      </div>
+                      {selectedTemplate.isAutoCreated && selectedTemplate.detectionMetadata?.confidence && (
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Confidence: {Math.round((selectedTemplate.detectionMetadata.confidence || 0) * 100)}%
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                       {selectedTemplate.description || 'No description'}
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {Object.keys(selectedTemplate.fieldMappings || {}).length} fields required
+                    
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div className="text-gray-600 dark:text-gray-400">
+                        <span className="font-medium">Fields:</span> {Object.keys(selectedTemplate.fieldMappings || {}).length}
+                      </div>
+                      {selectedTemplate.isAutoCreated && (
+                        <div className="text-gray-600 dark:text-gray-400">
+                          <span className="font-medium">Type:</span> {selectedTemplate.templateType || 'custom'}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {selectedTemplate.isAutoCreated && selectedTemplate.detectionMetadata && (
+                      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <div className="grid grid-cols-2 gap-4 text-xs text-gray-600 dark:text-gray-400">
+                          {selectedTemplate.detectionMetadata.totalMarkersFound && (
+                            <div>
+                              <span className="font-medium">Markers Found:</span> {selectedTemplate.detectionMetadata.totalMarkersFound}
+                            </div>
+                          )}
+                          {selectedTemplate.detectionMetadata.processingTime && (
+                            <div>
+                              <span className="font-medium">Analysis Time:</span> {Math.round(selectedTemplate.detectionMetadata.processingTime / 1000)}s
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Show field names for better transparency */}
+                    {showAllFields && selectedTemplate.fieldMappings && (
+                      <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <div className="text-xs font-medium text-gray-900 dark:text-white mb-2">Template Fields:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(selectedTemplate.fieldMappings).map(([fieldName, mapping]) => (
+                            <span 
+                              key={fieldName} 
+                              className="text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-1 rounded"
+                              title={mapping.fieldDefinition?.label || fieldName}
+                            >
+                              {mapping.fieldDefinition?.label || fieldName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="mt-2 text-center">
+                      <button
+                        onClick={() => setShowAllFields(!showAllFields)}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {showAllFields ? 'Hide' : 'Show'} Field Details
+                      </button>
                     </div>
                   </div>
                 )}
