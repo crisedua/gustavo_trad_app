@@ -364,11 +364,7 @@ export class OCRService {
       const tempFile = bucket.file(tempInputPath);
       
       console.log(`Uploading ${docType} to temp location:`, tempInputPath);
-      await tempFile.save(fileBuffer, {
-        metadata: {
-          contentType: mimeType
-        }
-      });
+      await this.uploadWithFallback(tempBucket, tempInputPath, fileBuffer, mimeType);
       
       const tempGsUri = `gs://${tempBucket}/${tempInputPath}`;
       const outputGsUri = `gs://${tempBucket}/${tempOutputPath}`;
@@ -392,10 +388,7 @@ export class OCRService {
       const [result] = await operation.promise();
       
       // Read all output files  
-      const [outputFiles] = await bucket.getFiles({ 
-        prefix: tempOutputPath,
-        autoPaginate: true 
-      });
+      const outputFiles = await this.listFilesWithFallback(tempBucket, tempOutputPath);
       
       if (outputFiles.length === 0) {
         throw new Error(`No output files found from ${docType} processing`);
@@ -430,10 +423,12 @@ export class OCRService {
       // Clean up temporary files
       try {
         console.log('Cleaning up temporary files...');
-        await tempFile.delete();
-        await Promise.all(outputFiles.map(file => file.delete().catch(err => {
-          console.warn(`Failed to delete ${file.name}:`, err);
-        })));
+        await this.deleteFileWithFallback(tempBucket, tempInputPath);
+        await Promise.all(outputFiles.map(file => 
+          this.deleteFileWithFallback(tempBucket, file.name).catch(err => {
+            console.warn(`Failed to delete ${file.name}:`, err);
+          })
+        ));
         console.log('✅ Cleanup completed');
       } catch (cleanupError) {
         console.warn('⚠️ Some cleanup operations failed:', cleanupError);
@@ -449,6 +444,109 @@ export class OCRService {
     } catch (error) {
       console.error(`${mimeType} processing failed:`, error);
       throw new Error(`Document processing failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async uploadWithFallback(bucketName: string, filePath: string, fileBuffer: Buffer, mimeType: string): Promise<void> {
+    console.log('Attempting to upload file with fallback authentication:', filePath);
+    
+    // Try user credentials first
+    try {
+      console.log('Trying upload with user credentials...');
+      const bucket = this.storage.bucket(bucketName);
+      const file = bucket.file(filePath);
+      await file.save(fileBuffer, {
+        metadata: {
+          contentType: mimeType
+        }
+      });
+      console.log('✅ Upload successful with user credentials');
+      return;
+    } catch (userError) {
+      console.log('❌ User credentials upload failed:', userError instanceof Error ? userError.message : String(userError));
+      
+      // Fallback to Replit's storage client
+      try {
+        console.log('Trying upload with Replit storage client...');
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(filePath);
+        await file.save(fileBuffer, {
+          metadata: {
+            contentType: mimeType
+          }
+        });
+        console.log('✅ Upload successful with Replit credentials');
+        return;
+      } catch (replitError) {
+        console.error('❌ Both credential methods failed for upload');
+        console.error('User credentials error:', userError instanceof Error ? userError.message : String(userError));
+        console.error('Replit credentials error:', replitError instanceof Error ? replitError.message : String(replitError));
+        throw new Error(`Failed to upload file to ${bucketName}/${filePath}: Both authentication methods failed. User error: ${userError instanceof Error ? userError.message : String(userError)}. Replit error: ${replitError instanceof Error ? replitError.message : String(replitError)}`);
+      }
+    }
+  }
+
+  private async listFilesWithFallback(bucketName: string, prefix: string): Promise<any[]> {
+    console.log('Attempting to list files with fallback authentication, prefix:', prefix);
+    
+    // Try user credentials first
+    try {
+      console.log('Trying list files with user credentials...');
+      const bucket = this.storage.bucket(bucketName);
+      const [files] = await bucket.getFiles({ 
+        prefix: prefix,
+        autoPaginate: true 
+      });
+      console.log('✅ List files successful with user credentials');
+      return files;
+    } catch (userError) {
+      console.log('❌ User credentials list failed:', userError instanceof Error ? userError.message : String(userError));
+      
+      // Fallback to Replit's storage client
+      try {
+        console.log('Trying list files with Replit storage client...');
+        const bucket = objectStorageClient.bucket(bucketName);
+        const [files] = await bucket.getFiles({ 
+          prefix: prefix,
+          autoPaginate: true 
+        });
+        console.log('✅ List files successful with Replit credentials');
+        return files;
+      } catch (replitError) {
+        console.error('❌ Both credential methods failed for listing files');
+        console.error('User credentials error:', userError instanceof Error ? userError.message : String(userError));
+        console.error('Replit credentials error:', replitError instanceof Error ? replitError.message : String(replitError));
+        throw new Error(`Failed to list files in ${bucketName} with prefix ${prefix}: Both authentication methods failed. User error: ${userError instanceof Error ? userError.message : String(userError)}. Replit error: ${replitError instanceof Error ? replitError.message : String(replitError)}`);
+      }
+    }
+  }
+
+  private async deleteFileWithFallback(bucketName: string, filePath: string): Promise<void> {
+    console.log('Attempting to delete file with fallback authentication:', filePath);
+    
+    // Try user credentials first
+    try {
+      const bucket = this.storage.bucket(bucketName);
+      const file = bucket.file(filePath);
+      await file.delete();
+      console.log('✅ Delete successful with user credentials');
+      return;
+    } catch (userError) {
+      console.log('❌ User credentials delete failed:', userError instanceof Error ? userError.message : String(userError));
+      
+      // Fallback to Replit's storage client
+      try {
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(filePath);
+        await file.delete();
+        console.log('✅ Delete successful with Replit credentials');
+        return;
+      } catch (replitError) {
+        console.error('❌ Both credential methods failed for delete');
+        console.error('User credentials error:', userError instanceof Error ? userError.message : String(userError));
+        console.error('Replit credentials error:', replitError instanceof Error ? replitError.message : String(replitError));
+        throw new Error(`Failed to delete file ${bucketName}/${filePath}: Both authentication methods failed. User error: ${userError instanceof Error ? userError.message : String(userError)}. Replit error: ${replitError instanceof Error ? replitError.message : String(replitError)}`);
+      }
     }
   }
 }
