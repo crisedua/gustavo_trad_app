@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,10 +65,13 @@ export default function DocumentProcessor() {
     queryKey: ['/api/templates'],
   });
 
-  // Auto-select first template when templates load if no template is selected
-  if (templates.length > 0 && !selectedTemplateId) {
-    setSelectedTemplateId(templates[0].id);
-  }
+  // Auto-select first template when templates load if no template is selected - FIXED
+  useEffect(() => {
+    if (templates.length > 0 && !selectedTemplateId) {
+      console.log('Auto-selecting first template:', templates[0].id);
+      setSelectedTemplateId(templates[0].id);
+    }
+  }, [templates, selectedTemplateId]);
 
   // Fetch processing jobs
   const { data: processingJobs = [], isLoading: jobsLoading } = useQuery<ProcessingJob[]>({
@@ -166,13 +169,26 @@ export default function DocumentProcessor() {
         status: 'Uploaded'
       }]);
 
+      // CRITICAL FIX: Validate templateId before creating processing job
+      if (!selectedTemplateId || selectedTemplateId === '') {
+        toast({
+          title: "Error",
+          description: "Please select a template before uploading a document.",
+          variant: "destructive",
+        });
+        console.error('Processing job creation aborted: No template selected');
+        return;
+      }
+
+      console.log('Creating processing job with templateId:', selectedTemplateId);
+      
       // Start processing
       createJobMutation.mutate({
         originalFilePath: uploadedFile.uploadURL || '',
         templateId: selectedTemplateId
       });
     }
-  }, [selectedTemplateId, createJobMutation]);
+  }, [selectedTemplateId, createJobMutation, toast]);
 
   // Handle extracted data changes
   const handleExtractedDataChange = (field: string, value: string) => {
