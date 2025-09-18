@@ -205,14 +205,49 @@ export class OCRService {
     
     // Check ZIP/DOCX header (PK signature - 0x50, 0x4B)
     if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B) {
-      // Check if it's likely a DOCX by extension or content
-      if (filePath.toLowerCase().includes('.docx') || filePath.toLowerCase().includes('.doc')) {
+      // Check if it's a DOCX by looking for DOCX internal structure
+      if (this.isDocxZipFile(buffer)) {
         return 'docx';
       }
     }
     
     // Check file extension as fallback
     return this.detectFileTypeFromPath(filePath);
+  }
+  
+  /**
+   * Check if a ZIP buffer contains DOCX internal structure
+   */
+  private isDocxZipFile(buffer: Buffer): boolean {
+    try {
+      // Convert buffer to string to search for DOCX signatures
+      const bufferString = buffer.toString('binary');
+      
+      // Look for typical DOCX internal files
+      const docxSignatures = [
+        '[Content_Types].xml',
+        'word/document.xml', 
+        '_rels/.rels',
+        'docProps/core.xml',
+        'word/_rels/document.xml.rels'
+      ];
+      
+      // Check if at least 2 of these signatures exist
+      let signatureCount = 0;
+      for (const signature of docxSignatures) {
+        if (bufferString.includes(signature)) {
+          signatureCount++;
+          if (signatureCount >= 2) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      // If inspection fails, fall back to extension-based detection
+      return false;
+    }
   }
   
   private detectFileTypeFromPath(filePath: string): 'pdf' | 'tiff' | 'image' | 'docx' {

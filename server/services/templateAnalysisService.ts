@@ -199,6 +199,8 @@ export class TemplateAnalysisService {
           
           if (fileType === 'pdf') {
             detailedResults = await this.extractPDFTextWithPositions(fileBuffer);
+          } else if (fileType === 'docx') {
+            detailedResults = await this.extractDOCXTextWithPositions(fileBuffer);
           } else {
             detailedResults = await this.extractImageTextWithPositions(fileBuffer);
           }
@@ -210,6 +212,8 @@ export class TemplateAnalysisService {
           
           if (fileType === 'pdf') {
             detailedResults = await this.extractPDFTextWithPositions(fileBuffer);
+          } else if (fileType === 'docx') {
+            detailedResults = await this.extractDOCXTextWithPositions(fileBuffer);
           } else {
             detailedResults = await this.extractImageTextWithPositions(fileBuffer);
           }
@@ -313,6 +317,51 @@ export class TemplateAnalysisService {
     } catch (error) {
       console.error('Image text extraction with positions failed:', error);
       throw error;
+    }
+  }
+  
+  /**
+   * Extract text with positions from DOCX files using OCR service
+   */
+  private async extractDOCXTextWithPositions(docxBuffer: Buffer): Promise<any[]> {
+    try {
+      console.log('Extracting DOCX text with positions');
+      
+      // Use mammoth to extract text from DOCX buffer directly
+      const mammoth = require('mammoth');
+      const result = await mammoth.extractRawText({ buffer: docxBuffer });
+      const docxText = result.value;
+      console.log('DOCX text extracted, length:', docxText.length);
+      
+      // Since DOCX doesn't have traditional page positions like PDF, 
+      // we create synthetic position data for the text
+      const words = docxText.split(/\s+/).filter((word: string) => word.trim());
+      const textAnnotations = words.map((word: string, index: number) => ({
+        description: word,
+        boundingPoly: {
+          vertices: [
+            { x: (index % 10) * 50, y: Math.floor(index / 10) * 20 },
+            { x: (index % 10) * 50 + word.length * 8, y: Math.floor(index / 10) * 20 },
+            { x: (index % 10) * 50 + word.length * 8, y: Math.floor(index / 10) * 20 + 16 },
+            { x: (index % 10) * 50, y: Math.floor(index / 10) * 20 + 16 }
+          ]
+        }
+      }));
+      
+      // Return as single page result
+      const pageResults = [{
+        page: 1,
+        width: 612, // Default page width
+        height: 792, // Default page height
+        textAnnotations
+      }];
+      
+      return pageResults;
+      
+    } catch (error) {
+      console.error('DOCX text extraction with positions failed:', error);
+      // Fallback to treating as image
+      return await this.extractImageTextWithPositions(docxBuffer);
     }
   }
 
@@ -898,22 +947,71 @@ Document excerpt: ${fullText.substring(0, 1000)}...`;
   /**
    * Detect file type from buffer and filename
    */
-  private detectFileType(buffer: Buffer, fileName: string): 'pdf' | 'image' {
-    // Check file extension first
-    const extension = fileName.toLowerCase().split('.').pop();
-    if (extension === 'pdf') {
+  private detectFileType(buffer: Buffer, fileName: string): 'pdf' | 'tiff' | 'image' | 'docx' {
+    // Check PDF header
+    if (buffer.length >= 4 && buffer.subarray(0, 4).toString() === '%PDF') {
       return 'pdf';
     }
     
-    // Check magic bytes for PDF
+    // Check TIFF headers (II* for little-endian, MM* for big-endian)
     if (buffer.length >= 4) {
-      const header = buffer.subarray(0, 4).toString();
-      if (header === '%PDF') {
-        return 'pdf';
+      const header = buffer.subarray(0, 4);
+      if ((header[0] === 0x49 && header[1] === 0x49 && header[2] === 0x2A && header[3] === 0x00) ||
+          (header[0] === 0x4D && header[1] === 0x4D && header[2] === 0x00 && header[3] === 0x2A)) {
+        return 'tiff';
       }
     }
     
+    // Check ZIP/DOCX header (PK signature - 0x50, 0x4B)
+    if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B) {
+      // Check if it's a DOCX by looking for DOCX internal structure
+      if (this.isDocxZipFile(buffer)) {
+        return 'docx';
+      }
+    }
+    
+    // Check file extension as fallback
+    const extension = fileName.toLowerCase().split('.').pop() || '';
+    if (extension === 'pdf') return 'pdf';
+    if (['tiff', 'tif'].includes(extension)) return 'tiff';
+    if (['docx', 'doc'].includes(extension)) return 'docx';
+    
     // Default to image for other file types
     return 'image';
+  }
+  
+  /**
+   * Check if a ZIP buffer contains DOCX internal structure
+   */
+  private isDocxZipFile(buffer: Buffer): boolean {
+    try {
+      // Convert buffer to string to search for DOCX signatures
+      const bufferString = buffer.toString('binary');
+      
+      // Look for typical DOCX internal files
+      const docxSignatures = [
+        '[Content_Types].xml',
+        'word/document.xml', 
+        '_rels/.rels',
+        'docProps/core.xml',
+        'word/_rels/document.xml.rels'
+      ];
+      
+      // Check if at least 2 of these signatures exist
+      let signatureCount = 0;
+      for (const signature of docxSignatures) {
+        if (bufferString.includes(signature)) {
+          signatureCount++;
+          if (signatureCount >= 2) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      // If inspection fails, fall back to extension-based detection
+      return false;
+    }
   }
 }
