@@ -121,10 +121,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       'image/jpg',
       'image/gif',
       'image/tiff',
-      'image/bmp'
+      'image/bmp',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+      'application/octet-stream' // Sometimes DOCX files are detected as this
     ];
     
-    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.tiff', '.tif', '.bmp'];
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.tiff', '.tif', '.bmp', '.docx'];
     const fileExtension = path.extname(file.originalname).toLowerCase();
     
     if (!allowedMimeTypes.includes(file.mimetype)) {
@@ -561,7 +563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalFilePath,
         templateId: templateId || null,
         status: 'uploading',
-        extractedData: {}
+        extractedData: {},
+        extractedFieldValues: {}
       });
 
       const job = await storage.createProcessingJob(jobData);
