@@ -435,7 +435,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Clean up template file from storage
       try {
-        const templateFilePath = path.join(process.cwd(), 'public-objects', template.filePath);
+        // Fix: template.filePath already contains 'public-objects/templates/', so join directly with cwd
+        const templateFilePath = path.join(process.cwd(), template.filePath);
         if (fs.existsSync(templateFilePath)) {
           fs.unlinkSync(templateFilePath);
           console.log(`✅ Template file deleted: ${templateFilePath}`);
@@ -515,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         templateType: autoTemplate.templateType,
         detectionMetadata: autoTemplate.detectionMetadata,
         fieldMappings: autoTemplate.fieldMappings,
-        validationRules: null // Will be added later if needed
+        validationRules: {} // Default empty validation rules
       });
 
       const template = await storage.createTemplate(templateData);
