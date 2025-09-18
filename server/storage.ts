@@ -333,7 +333,7 @@ export class MemStorage implements IStorage {
       sourceDocumentPath: insertTemplate.sourceDocumentPath ?? null,
       templateType: insertTemplate.templateType ?? null,
       detectionMetadata: insertTemplate.detectionMetadata ?? null,
-      validationRules: insertTemplate.validationRules ?? null,
+      validationRules: insertTemplate.validationRules ?? {},
       createdAt: new Date(),
       updatedAt: new Date()
     };
