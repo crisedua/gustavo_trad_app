@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { PathValidator } from '../security/pathValidator';
 import { SSRFProtection } from '../security/ssrfProtection';
+import * as mammoth from 'mammoth';
 
 export class OCRService {
   private client: ImageAnnotatorClient;
@@ -110,6 +111,9 @@ export class OCRService {
         } else if (fileType === 'tiff') {
           // Process TIFF as image using direct buffer approach
           return await this.extractTextFromImageBuffer(fileBuffer);
+        } else if (fileType === 'docx') {
+          // Process DOCX files by extracting text directly
+          return await this.extractTextFromDOCXBuffer(fileBuffer);
         } else {
           // Process as image using buffer
           return await this.extractTextFromImageBuffer(fileBuffer);
@@ -128,6 +132,9 @@ export class OCRService {
         } else if (fileType === 'tiff') {
           // Process TIFF as image using direct buffer approach
           return await this.extractTextFromImageBuffer(fileBuffer);
+        } else if (fileType === 'docx') {
+          // Process DOCX files by extracting text directly
+          return await this.extractTextFromDOCXBuffer(fileBuffer);
         } else {
           return await this.extractTextFromImageBuffer(fileBuffer);
         }
@@ -152,9 +159,8 @@ export class OCRService {
         // Process TIFF as image using direct buffer approach
         return await this.extractTextFromImageBuffer(fileBuffer);
       } else if (fileType === 'docx') {
-        // For DOCX files, we need to convert them to images first
-        // For now, inform user that DOCX needs to be converted to PDF
-        throw new Error('DOCX files are not supported directly. Please convert to PDF format first.');
+        // Process DOCX files by extracting text directly
+        return await this.extractTextFromDOCXBuffer(fileBuffer);
       } else {
         // Process as image using buffer
         return await this.extractTextFromImageBuffer(fileBuffer);
@@ -497,6 +503,32 @@ export class OCRService {
     } catch (error) {
       console.error('Image OCR failed:', error);
       throw new Error(`Image OCR failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async extractTextFromDOCXBuffer(docxBuffer: Buffer): Promise<string> {
+    try {
+      console.log('Extracting text from DOCX buffer, size:', docxBuffer.length, 'bytes');
+      
+      // Use mammoth to extract text from DOCX
+      const result = await mammoth.extractRawText({ buffer: docxBuffer });
+      const extractedText = result.value;
+      
+      console.log('DOCX text extraction completed, length:', extractedText.length);
+      console.log('First 200 chars:', extractedText.substring(0, 200));
+      
+      if (result.messages && result.messages.length > 0) {
+        console.log('DOCX extraction warnings:', result.messages.map(m => m.message).join(', '));
+      }
+      
+      if (!extractedText.trim()) {
+        throw new Error('No text extracted from DOCX file');
+      }
+      
+      return extractedText.trim();
+    } catch (error) {
+      console.error('DOCX text extraction failed:', error);
+      throw new Error(`DOCX processing failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
