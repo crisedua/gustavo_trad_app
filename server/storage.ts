@@ -368,9 +368,9 @@ export class MemStorage implements IStorage {
     const job: ProcessingJob = {
       ...insertJob,
       id,
-      extractedData: insertJob.extractedData ?? null,
+      extractedData: insertJob.extractedData ?? {},
       templateId: insertJob.templateId ?? null,
-      extractedFieldValues: insertJob.extractedFieldValues ?? null,
+      extractedFieldValues: insertJob.extractedFieldValues ?? {},
       errorMessage: null,
       generatedDocumentPath: null,
       createdAt: new Date(),

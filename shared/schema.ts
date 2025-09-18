@@ -317,9 +317,9 @@ export const insertProcessingJobSchema = createInsertSchema(processingJobs).pick
   templateId: true,
   extractedFieldValues: true,
 }).extend({
-  // Add validation for extracted field values
-  extractedData: z.record(z.string(), z.string()).optional(),
-  extractedFieldValues: z.record(z.string(), z.string()).optional(),
+  // Add validation for extracted field values - require empty objects instead of null
+  extractedData: z.record(z.string(), z.string()).default({}),
+  extractedFieldValues: z.record(z.string(), z.string()).default({}),
 });
 
 // Updated schemas for automated template creation
