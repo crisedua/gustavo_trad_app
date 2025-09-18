@@ -561,7 +561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalFilePath,
         templateId: templateId || null,
         status: 'uploading',
-        extractedData: null
+        extractedData: {}
       });
 
       const job = await storage.createProcessingJob(jobData);
