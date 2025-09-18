@@ -53,7 +53,7 @@ const statusSteps = [
 
 export default function DocumentProcessor() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('default-marriage-cert');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; status: string }>>([]);
   const [showAllFields, setShowAllFields] = useState(false);
 
@@ -64,6 +64,11 @@ export default function DocumentProcessor() {
   const { data: templates = [], isLoading: templatesLoading } = useQuery<Template[]>({
     queryKey: ['/api/templates'],
   });
+
+  // Auto-select first template when templates load if no template is selected
+  if (templates.length > 0 && !selectedTemplateId) {
+    setSelectedTemplateId(templates[0].id);
+  }
 
   // Fetch processing jobs
   const { data: processingJobs = [], isLoading: jobsLoading } = useQuery<ProcessingJob[]>({
