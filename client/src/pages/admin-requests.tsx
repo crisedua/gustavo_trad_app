@@ -43,6 +43,7 @@ interface Template {
 interface ProcessingJob {
   id: string;
   originalFilePath: string;
+  userEmail: string;
   status: string;
   extractedData?: Record<string, string>;
   templateId?: string;
@@ -339,6 +340,7 @@ export default function AdminRequests() {
                     <TableRow>
                       <TableHead>Document</TableHead>
                       <TableHead>Template</TableHead>
+                      <TableHead>User Email</TableHead>
                       <TableHead>Upload Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -371,6 +373,14 @@ export default function AdminRequests() {
                                 AI
                               </Badge>
                             )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                            <User className="h-4 w-4" />
+                            <span data-testid={`job-email-${job.id}`}>
+                              {job.userEmail}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
