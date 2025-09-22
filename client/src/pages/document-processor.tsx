@@ -69,13 +69,13 @@ export default function DocumentProcessor() {
     queryKey: ['/api/templates'],
   });
 
-  // Auto-select first template when templates load if no template is selected - FIXED
-  useEffect(() => {
-    if (templates.length > 0 && !selectedTemplateId) {
-      console.log('Auto-selecting first template:', templates[0].id);
-      setSelectedTemplateId(templates[0].id);
-    }
-  }, [templates, selectedTemplateId]);
+  // Remove auto-selection to allow user to choose template
+  // useEffect(() => {
+  //   if (templates.length > 0 && !selectedTemplateId) {
+  //     console.log('Auto-selecting first template:', templates[0].id);
+  //     setSelectedTemplateId(templates[0].id);
+  //   }
+  // }, [templates, selectedTemplateId]);
 
   // Fetch processing jobs
   const { data: processingJobs = [], isLoading: jobsLoading } = useQuery<ProcessingJob[]>({
@@ -176,8 +176,8 @@ export default function DocumentProcessor() {
       // Get current state values at upload time (avoid stale closures)
       // Use a small timeout to ensure DOM updates and state changes have been processed  
       setTimeout(() => {
-        // Get fresh state values to avoid closure issues
-        const currentSelectedTemplateIdFresh = templates.length > 0 && !selectedTemplateId ? templates[0].id : selectedTemplateId;
+        // Get fresh state values to avoid closure issues - no auto-fallback to first template
+        const currentSelectedTemplateIdFresh = selectedTemplateId;
         
         // Get current email value from the DOM as backup to ensure we have the latest value
         const emailInput = document.getElementById('user-email') as HTMLInputElement;
@@ -318,6 +318,7 @@ export default function DocumentProcessor() {
                     className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     data-testid="select-template"
                   >
+                    <option value="" disabled>Select a template...</option>
                     {templates.map((template) => (
                       <option key={template.id} value={template.id}>
                         {template.isAutoCreated ? '🤖 ' : '📄 '}{template.name}
