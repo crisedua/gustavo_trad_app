@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -390,19 +391,28 @@ export default function DocumentProcessor() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Upload the document to extract data for your selected template</p>
               </div>
               
-              <ObjectUploader
-                maxNumberOfFiles={1}
-                maxFileSize={10485760} // 10MB
-                onGetUploadParameters={handleGetUploadParameters}
-                onComplete={handleUploadComplete}
-                buttonClassName="w-full"
-              >
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors" data-testid="upload-zone">
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Drop files here or click to browse</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">PDF, Images, or DOCX files up to 10MB</p>
+              {templatesLoading ? (
+                <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-12 text-center" data-testid="upload-loading">
+                  <Clock className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <Skeleton className="h-6 w-48 mx-auto mb-2" />
+                  <Skeleton className="h-4 w-32 mx-auto" />
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-4">Loading templates...</p>
                 </div>
-              </ObjectUploader>
+              ) : (
+                <ObjectUploader
+                  maxNumberOfFiles={1}
+                  maxFileSize={10485760} // 10MB
+                  onGetUploadParameters={handleGetUploadParameters}
+                  onComplete={handleUploadComplete}
+                  buttonClassName="w-full"
+                >
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors" data-testid="upload-zone">
+                    <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Drop files here or click to browse</h3>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">PDF, Images, or DOCX files up to 10MB</p>
+                  </div>
+                </ObjectUploader>
+              )}
                   
               {/* Uploaded Files */}
               {uploadedFiles.length > 0 && (
