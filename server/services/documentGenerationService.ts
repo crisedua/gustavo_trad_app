@@ -78,9 +78,9 @@ export class DocumentGenerationService {
         return await this.fillPDFWithCoordinates(pdfDoc, template.fieldMappings, extractedFieldValues);
       }
       
-      // Fallback to legacy method for manual templates without form fields
-      console.log('No form fields found, using legacy PDF creation...');
-      return await this.createPDFFromZero(extractedFieldValues);
+      // Fallback to creating DIAN tax form from scratch
+      console.log('Creating DIAN tax form from scratch...');
+      return await this.createDIANTaxForm(extractedFieldValues);
       
     } catch (error) {
       console.error('PDF template filling failed:', error);
@@ -459,6 +459,379 @@ export class DocumentGenerationService {
       
     } catch (error) {
       console.error('Coordinate-based PDF filling failed:', error);
+      throw error;
+    }
+  }
+
+  private async createDIANTaxForm(extractedFieldValues: Record<string, string>): Promise<Buffer> {
+    try {
+      console.log('Creating DIAN tax form with extracted data:', extractedFieldValues);
+      
+      // Create a new PDF document
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([612, 792]); // Standard letter size
+      const { width, height } = page.getSize();
+      
+      // Embed fonts
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // DIAN Header
+      page.drawText('DIAN', {
+        x: 50,
+        y: height - 50,
+        size: 20,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Income Tax Return and Complementary Return for Resident', {
+        x: 150,
+        y: height - 50,
+        size: 12,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Individuals and Equivalent Taxpayers, and Estates of Resident', {
+        x: 150,
+        y: height - 65,
+        size: 12,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Decedents', {
+        x: 150,
+        y: height - 80,
+        size: 12,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      // Form number (top right)
+      page.drawText('210', {
+        x: width - 80,
+        y: height - 50,
+        size: 16,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      let currentY = height - 120;
+
+      // Year and Form Number section
+      page.drawText('1. Year', {
+        x: 50,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(extractedFieldValues.year || '2023', {
+        x: 100,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('4. Form Number:', {
+        x: 300,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(extractedFieldValues.number || extractedFieldValues.tax_id || 'N/A', {
+        x: 380,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 30;
+
+      // Space reserved for DIAN use
+      page.drawText('Space reserved for use by DIAN', {
+        x: 50,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      page.drawText('/barcode/', {
+        x: 300,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      page.drawText('/barcode/', {
+        x: 450,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      currentY -= 40;
+
+      // Taxpayer Identification section
+      page.drawText('5. Tax Identification Number (NIT):', {
+        x: 50,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('6.', {
+        x: 200,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('7. First Surname', {
+        x: 230,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('8. Second Surname', {
+        x: 330,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('9. First Name:', {
+        x: 430,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('10. Other Names', {
+        x: 510,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 20;
+
+      // Values for identification section
+      page.drawText(extractedFieldValues.tax_id || 'N/A', {
+        x: 50,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(extractedFieldValues.first_surname || 'N/A', {
+        x: 230,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(extractedFieldValues.other_names || 'N/A', {
+        x: 330,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(extractedFieldValues.first_name || 'N/A', {
+        x: 430,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 40;
+
+      // Main Economic Activity section
+      page.drawText('21. Main Economic Activity:', {
+        x: 50,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Specify (if it is a', {
+        x: 180,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('25.', {
+        x: 260,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('26. Prior Year Return Number:', {
+        x: 290,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('27. Partial Year Return for', {
+        x: 450,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 15;
+
+      page.drawText('complement)', {
+        x: 180,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Additional Data', {
+        x: 450,
+        y: currentY,
+        size: 9,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 30;
+
+      // Assets section
+      page.drawText('Assets', {
+        x: 50,
+        y: currentY,
+        size: 12,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Total Gross Assets', {
+        x: 150,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('25.', {
+        x: 260,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Liabilities+Debts', {
+        x: 330,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('30.', {
+        x: 430,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('Net Worth', {
+        x: 470,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText('31.', {
+        x: 520,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 40;
+
+      // Date section
+      page.drawText('Date:', {
+        x: 50,
+        y: currentY,
+        size: 10,
+        font: font,
+        color: rgb(0, 0, 0),
+      });
+
+      page.drawText(extractedFieldValues.date || 'N/A', {
+        x: 90,
+        y: currentY,
+        size: 10,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+
+      currentY -= 40;
+
+      // Footer note
+      page.drawText('This is a computer-generated DIAN tax form document', {
+        x: 50,
+        y: 50,
+        size: 8,
+        font: font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      page.drawText(`Generated on: ${new Date().toLocaleDateString()}`, {
+        x: 50,
+        y: 35,
+        size: 8,
+        font: font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      console.log('Successfully created DIAN tax form PDF from scratch');
+      
+      // Save the PDF
+      const filledPdfBytes = await pdfDoc.save();
+      return Buffer.from(filledPdfBytes);
+      
+    } catch (error) {
+      console.error('DIAN tax form creation failed:', error);
       throw error;
     }
   }
