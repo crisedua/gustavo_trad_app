@@ -21,6 +21,8 @@ export class DocumentGenerationService {
       }
       
       console.log(`Reading template from: ${resolvedPath}`);
+      console.log(`Template ID: ${template.id}`);
+      console.log(`Template name: ${template.name}`);
       console.log(`Template type: ${template.isAutoCreated ? 'auto-created' : 'manual'}`);
       
       // Read the template file
@@ -34,6 +36,20 @@ export class DocumentGenerationService {
       const fields = form.getFields();
       
       console.log(`Found ${fields.length} form fields in template`);
+      
+      // Debug: Log all form field details
+      if (fields.length > 0) {
+        console.log('Form field details:');
+        fields.forEach((field, index) => {
+          try {
+            console.log(`  Field ${index + 1}: Name="${field.getName()}", Type="${field.constructor.name}"`);
+          } catch (error) {
+            console.log(`  Field ${index + 1}: Error getting field info - ${error}`);
+          }
+        });
+      } else {
+        console.log('⚠️ No form fields detected - this template may not have interactive form fields');
+      }
       
       // Try to fill existing form fields first (for both manual and auto-created templates)
       if (fields.length > 0) {
