@@ -38,44 +38,82 @@ export class DocumentGenerationService {
       // Try to fill existing form fields first (for both manual and auto-created templates)
       if (fields.length > 0) {
         console.log('Attempting to fill existing form fields...');
+        console.log('Available form fields:', fields.map(f => f.getName()));
         
         let fieldsFilledCount = 0;
-        for (const [fieldName, value] of Object.entries(extractedFieldValues)) {
+        
+        // Enhanced field mapping for DIAN tax forms
+        const fieldMappings = {
+          // Basic mappings
+          'year': extractedFieldValues.year || '2023',
+          'tax_id': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          'nit': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          'first_surname': extractedFieldValues.first_surname || '',
+          'second_surname': extractedFieldValues.second_surname || '',
+          'first_name': extractedFieldValues.first_name || '',
+          'other_names': extractedFieldValues.other_names || '',
+          'form_number': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          
+          // Common field name variations
+          'Year': extractedFieldValues.year || '2023',
+          'Tax_ID': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          'NIT': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          'First_Surname': extractedFieldValues.first_surname || '',
+          'Second_Surname': extractedFieldValues.second_surname || '',
+          'First_Name': extractedFieldValues.first_name || '',
+          'Other_Names': extractedFieldValues.other_names || '',
+          'Form_Number': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          
+          // Numbered field variations (common in PDF forms)
+          'field_1': extractedFieldValues.year || '2023',
+          'field_2': extractedFieldValues.tax_id || extractedFieldValues.number || '',
+          'field_3': extractedFieldValues.first_surname || '',
+          'field_4': extractedFieldValues.second_surname || '',
+          'field_5': extractedFieldValues.first_name || '',
+          'field_6': extractedFieldValues.other_names || '',
+        };
+        
+        // Try all field mappings
+        for (const [mappingName, value] of Object.entries(fieldMappings)) {
+          if (!value) continue;
+          
           try {
-            // For auto-created templates, also try AcroForm field names if available
-            const templateField = template.fieldMappings[fieldName];
-            let formFieldName = fieldName;
-            
-            if (templateField?.instances?.[0]?.acroForm?.fieldName) {
-              formFieldName = templateField.instances[0].acroForm.fieldName;
-            }
-            
-            const field = form.getTextField(formFieldName);
+            const field = form.getTextField(mappingName);
             if (field) {
-              field.setText(value);
-              console.log(`Filled form field ${formFieldName} with: ${value}`);
+              field.setText(String(value));
+              console.log(`✅ Filled form field "${mappingName}" with: ${value}`);
               fieldsFilledCount++;
             }
           } catch (error) {
-            // Try the original field name if AcroForm name fails
-            try {
-              const field = form.getTextField(fieldName);
-              if (field) {
-                field.setText(value);
-                console.log(`Filled form field ${fieldName} with: ${value}`);
-                fieldsFilledCount++;
-              }
-            } catch (innerError) {
-              console.warn(`Could not fill field ${fieldName}:`, error instanceof Error ? error.message : String(error));
-            }
+            // Field not found or wrong type, continue
           }
         }
         
+        // Also try the original extracted field names
+        for (const [fieldName, value] of Object.entries(extractedFieldValues)) {
+          if (!value) continue;
+          
+          try {
+            const field = form.getTextField(fieldName);
+            if (field) {
+              field.setText(String(value));
+              console.log(`✅ Filled form field "${fieldName}" with: ${value}`);
+              fieldsFilledCount++;
+            }
+          } catch (error) {
+            // Field not found or wrong type, continue
+          }
+        }
+        
+        console.log(`Attempted to fill form fields. Successfully filled: ${fieldsFilledCount}`);
+        
         if (fieldsFilledCount > 0) {
-          console.log(`Successfully filled ${fieldsFilledCount} form fields`);
+          console.log(`✅ Successfully filled ${fieldsFilledCount} form fields - using form field approach`);
           form.flatten();
           const filledPdfBytes = await pdfDoc.save();
           return Buffer.from(filledPdfBytes);
+        } else {
+          console.log(`⚠️ No form fields were filled. Available fields: ${fields.map(f => f.getName()).join(', ')}`);
         }
       }
       
@@ -85,9 +123,9 @@ export class DocumentGenerationService {
         return await this.fillPDFWithCoordinates(pdfDoc, template.fieldMappings, extractedFieldValues);
       }
       
-      // Check if this is a DIAN tax form - use HTML template approach
-      if (template.name.toLowerCase().includes('dian') || template.name.toLowerCase().includes('tax')) {
-        console.log('Using HTML template approach for DIAN tax form...');
+      // Only use HTML template approach if no form fields were found and it's a DIAN form
+      if ((template.name.toLowerCase().includes('dian') || template.name.toLowerCase().includes('tax')) && fields.length === 0) {
+        console.log('No form fields found - using HTML template approach for DIAN tax form...');
         return await this.htmlTemplateService.generateDIANDocument(extractedFieldValues);
       }
       
