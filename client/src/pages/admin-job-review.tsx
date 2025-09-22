@@ -171,13 +171,25 @@ export default function AdminJobReview() {
         extractedFieldValues: editableFields,
         templateId: selectedTemplateId
       });
-      return res.json();
+      
+      // Handle PDF response - create download link
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `generated_document_${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/processing-jobs', id] });
       toast({
         title: "Document Generated",
-        description: "The document has been generated successfully.",
+        description: "The document has been generated and downloaded successfully.",
       });
     },
     onError: (error) => {
