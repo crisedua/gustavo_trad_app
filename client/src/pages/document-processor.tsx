@@ -172,13 +172,14 @@ export default function DocumentProcessor() {
       }]);
 
       // CRITICAL FIX: Validate templateId before creating processing job
+      console.log('Upload validation check - selectedTemplateId:', selectedTemplateId, 'templates count:', templates.length);
       if (!selectedTemplateId || selectedTemplateId === '') {
         toast({
           title: "Error",
           description: "Please select a template before uploading a document.",
           variant: "destructive",
         });
-        console.error('Processing job creation aborted: No template selected');
+        console.error('Processing job creation aborted: No template selected. Current selectedTemplateId:', selectedTemplateId);
         return;
       }
 
