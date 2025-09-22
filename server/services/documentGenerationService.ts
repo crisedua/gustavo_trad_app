@@ -43,124 +43,85 @@ export class DocumentGenerationService {
     
     console.log(`🎯 Mapping ${Object.keys(extractedFieldValues).length} extracted values to ${formFieldNames.length} form fields`);
     console.log('Form fields found:', formFieldNames);
+    console.log('Extracted field keys:', Object.keys(extractedFieldValues));
     
-    // Create comprehensive bilingual mapping patterns (Spanish ↔ English)
-    const mappingPatterns = [
-      // Year mappings (English template fields ← Spanish/English extracted data)
-      { pattern: /^YEAR$/i, value: this.findBestValue(['year', 'año', 'anno'], extractedFieldValues) || '2023' },
-      { pattern: /^(Year|año|ANNO)$/i, value: this.findBestValue(['year', 'año', 'anno'], extractedFieldValues) || '2023' },
-      
-      // First Surname mappings (English template ← Spanish extracted)
-      { pattern: /^(FIRST.*SURNAME|FIRSTSURNAME)$/i, 
-        value: this.findBestValue(['first_surname', 'primer_apellido', 'primer apellido', 'apellido1'], extractedFieldValues) },
-      
-      // Second Surname mappings
-      { pattern: /^(SECOND.*SURNAME|SECONDSURNAME)$/i, 
-        value: this.findBestValue(['second_surname', 'segundo_apellido', 'segundo apellido', 'apellido2'], extractedFieldValues) },
-      
-      // First Name mappings
-      { pattern: /^(FIRST.*NAME|FIRST\s*NAME|FIRST)$/i, 
-        value: this.findBestValue(['first_name', 'primer_nombre', 'primer nombre', 'nombre1'], extractedFieldValues) },
-      
-      // Other Names mappings  
-      { pattern: /^(OTHER.*NAMES?|OTROS.*NOMBRES?)$/i, 
-        value: this.findBestValue(['other_names', 'otros_nombres', 'otros nombres', 'nombres_adicionales'], extractedFieldValues) },
-      
-      // Tax ID / NIT mappings (multiple variations)
-      { pattern: /^(NIT|TAX_?ID|IDENTIFICATION|Text\s*Field\s*\d*)$/i, 
-        value: this.findBestValue(['tax_id', 'nit', 'numero_identificacion', 'numero de identificacion', 'number', 'cedula'], extractedFieldValues) },
-      
-      // Form Number mappings
-      { pattern: /^(FORM.*NUMBER|NUMERO.*FORMULARIO)$/i, 
-        value: this.findBestValue(['form_number', 'numero_formulario', 'numero de formulario', 'tax_id', 'number'], extractedFieldValues) },
-      
-      // Spanish pattern mappings (for Spanish templates ← Spanish extracted)
-      { pattern: /^(PRIMER.*APELLIDO)$/i, 
-        value: this.findBestValue(['primer_apellido', 'primer apellido', 'first_surname', 'apellido1'], extractedFieldValues) },
-      { pattern: /^(SEGUNDO.*APELLIDO)$/i, 
-        value: this.findBestValue(['segundo_apellido', 'segundo apellido', 'second_surname', 'apellido2'], extractedFieldValues) },
-      { pattern: /^(PRIMER.*NOMBRE)$/i, 
-        value: this.findBestValue(['primer_nombre', 'primer nombre', 'first_name', 'nombre1'], extractedFieldValues) },
-      { pattern: /^(OTROS.*NOMBRES?)$/i, 
-        value: this.findBestValue(['otros_nombres', 'otros nombres', 'other_names', 'nombres_adicionales'], extractedFieldValues) },
-      
-      // Economic Activity / Main Activity
-      { pattern: /^(MAIN.*ECONOMIC.*ACTIVITY|ACTIVIDAD.*ECONOMICA)$/i,
-        value: this.findBestValue(['main_economic_activity', 'actividad_economica', 'actividad principal'], extractedFieldValues) },
-      
-      // Regional Office Code  
-      { pattern: /^(REGIONAL.*OFFICE.*CODE|CODIGO.*DIRECCION)$/i,
-        value: this.findBestValue(['regional_office_code', 'codigo_direccion', 'oficina_regional'], extractedFieldValues) },
-      
-      // Common numbered field patterns for DIAN tax forms
-      { pattern: /^1$/i, value: this.findBestValue(['year', 'año', 'anno'], extractedFieldValues) || '2023' },
-      { pattern: /^4$/i, value: this.findBestValue(['form_number', 'numero_formulario', 'tax_id', 'number'], extractedFieldValues) },
-      { pattern: /^5$/i, value: this.findBestValue(['tax_id', 'nit', 'numero_identificacion', 'number'], extractedFieldValues) },
-      { pattern: /^7$/i, value: this.findBestValue(['first_surname', 'primer_apellido', 'primer apellido'], extractedFieldValues) },
-      { pattern: /^8$/i, value: this.findBestValue(['second_surname', 'segundo_apellido', 'segundo apellido'], extractedFieldValues) },
-      { pattern: /^9$/i, value: this.findBestValue(['first_name', 'primer_nombre', 'primer nombre'], extractedFieldValues) },
-      { pattern: /^10$/i, value: this.findBestValue(['other_names', 'otros_nombres', 'otros nombres'], extractedFieldValues) },
-      { pattern: /^12$/i, value: this.findBestValue(['regional_office_code', 'codigo_direccion'], extractedFieldValues) },
-      { pattern: /^24$/i, value: this.findBestValue(['main_economic_activity', 'actividad_economica'], extractedFieldValues) },
-      { pattern: /^25$/i, value: this.findBestValue(['tax_code', 'codigo_impuesto'], extractedFieldValues) },
-      { pattern: /^26$/i, value: this.findBestValue(['prior_year_return', 'declaracion_año_anterior'], extractedFieldValues) },
-      { pattern: /^27$/i, value: this.findBestValue(['partial_year_return', 'declaracion_parcial'], extractedFieldValues) },
-      { pattern: /^28$/i, value: this.findBestValue(['e_invoice_percentage', 'porcentaje_factura_electronica'], extractedFieldValues) },
-      
-      // Asset fields (29-31)
-      { pattern: /^29$/i, value: this.findBestValue(['total_gross_assets', 'patrimonio_bruto_total', 'activos_totales'], extractedFieldValues) },
-      { pattern: /^30$/i, value: this.findBestValue(['liabilities_debts', 'pasivos_deudas', 'deudas'], extractedFieldValues) },
-      { pattern: /^31$/i, value: this.findBestValue(['net_worth', 'patrimonio_liquido', 'patrimonio_neto'], extractedFieldValues) },
-      
-      // Income fields (32-77+)
-      { pattern: /^32$/i, value: this.findBestValue(['gross_income', 'ingresos_brutos'], extractedFieldValues) },
-      { pattern: /^33$/i, value: this.findBestValue(['non_taxable_income', 'ingresos_no_gravados'], extractedFieldValues) },
-      { pattern: /^43$/i, value: this.findBestValue(['income_43', 'renta_43'], extractedFieldValues) },
-      { pattern: /^44$/i, value: this.findBestValue(['income_44', 'renta_44'], extractedFieldValues) },
-      { pattern: /^58$/i, value: this.findBestValue(['income_58', 'renta_58'], extractedFieldValues) },
-      { pattern: /^74$/i, value: this.findBestValue(['income_74', 'renta_74'], extractedFieldValues) },
-      { pattern: /^75$/i, value: this.findBestValue(['income_75', 'renta_75'], extractedFieldValues) },
-      { pattern: /^76$/i, value: this.findBestValue(['income_76', 'renta_76'], extractedFieldValues) },
-      { pattern: /^77$/i, value: this.findBestValue(['income_77', 'renta_77'], extractedFieldValues) },
-      
-      // Fallback generic numbered fields 
-      { pattern: /^(field|campo)_?1$/i, value: this.findBestValue(['year', 'año'], extractedFieldValues) || '2023' },
-      { pattern: /^(field|campo)_?2$/i, value: this.findBestValue(['tax_id', 'nit', 'number'], extractedFieldValues) },
-      { pattern: /^(field|campo)_?3$/i, value: this.findBestValue(['first_surname', 'primer_apellido'], extractedFieldValues) },
-      { pattern: /^(field|campo)_?4$/i, value: this.findBestValue(['second_surname', 'segundo_apellido'], extractedFieldValues) },
-      { pattern: /^(field|campo)_?5$/i, value: this.findBestValue(['first_name', 'primer_nombre'], extractedFieldValues) },
-      { pattern: /^(field|campo)_?6$/i, value: this.findBestValue(['other_names', 'otros_nombres'], extractedFieldValues) },
-    ];
-    
-    // Apply pattern matching
+    // Only create mappings for fields that actually exist in the PDF
     for (const fieldName of formFieldNames) {
       let mapped = false;
       
-      // Try each pattern
-      for (const { pattern, value } of mappingPatterns) {
-        if (pattern.test(fieldName) && value) {
-          mappings[fieldName] = value;
-          console.log(`✅ Mapped field "${fieldName}" -> "${value}" (pattern: ${pattern})`);
-          mapped = true;
-          break;
+      // Define bilingual mapping patterns for this specific field name
+      const getBestValueForField = (fieldName: string): string | undefined => {
+        
+        // Year field mappings
+        if (/^year$/i.test(fieldName)) {
+          return this.findBestValue(['year', 'año', 'anno'], extractedFieldValues) || '2023';
         }
-      }
-      
-      // If no pattern matched, try direct key matching
-      if (!mapped) {
+        
+        // First Surname field mappings  
+        if (/^(first.*surname|firstsurname)$/i.test(fieldName)) {
+          return this.findBestValue(['first_surname', 'primer_apellido', 'primer apellido', 'apellido1'], extractedFieldValues);
+        }
+        
+        // Second Surname field mappings
+        if (/^(second.*surname|secondsurname)$/i.test(fieldName)) {
+          return this.findBestValue(['second_surname', 'segundo_apellido', 'segundo apellido', 'apellido2'], extractedFieldValues);
+        }
+        
+        // First Name field mappings (handle "FIRST NAME" with space)
+        if (/^(first.*name|first\s*name|first)$/i.test(fieldName)) {
+          return this.findBestValue(['first_name', 'primer_nombre', 'primer nombre', 'nombre1'], extractedFieldValues);
+        }
+        
+        // Other Names field mappings
+        if (/^(other.*names?|otros.*nombres?)$/i.test(fieldName)) {
+          return this.findBestValue(['other_names', 'otros_nombres', 'otros nombres', 'nombres_adicionales'], extractedFieldValues);
+        }
+        
+        // Tax ID / NIT / Text Field mappings
+        if (/^(nit|tax_?id|identification|text\s*field\s*\d*)$/i.test(fieldName)) {
+          return this.findBestValue(['tax_id', 'nit', 'numero_identificacion', 'numero de identificacion', 'number', 'cedula'], extractedFieldValues);
+        }
+        
+        // Form Number mappings
+        if (/^(form.*number|numero.*formulario)$/i.test(fieldName)) {
+          return this.findBestValue(['form_number', 'numero_formulario', 'numero de formulario', 'tax_id', 'number'], extractedFieldValues);
+        }
+        
+        // Spanish field name mappings (for Spanish templates)
+        if (/^(primer.*apellido)$/i.test(fieldName)) {
+          return this.findBestValue(['primer_apellido', 'primer apellido', 'first_surname', 'apellido1'], extractedFieldValues);
+        }
+        
+        if (/^(segundo.*apellido)$/i.test(fieldName)) {
+          return this.findBestValue(['segundo_apellido', 'segundo apellido', 'second_surname', 'apellido2'], extractedFieldValues);
+        }
+        
+        if (/^(primer.*nombre)$/i.test(fieldName)) {
+          return this.findBestValue(['primer_nombre', 'primer nombre', 'first_name', 'nombre1'], extractedFieldValues);
+        }
+        
+        // Generic pattern fallback - direct name matching
         const normalizedFieldName = fieldName.toLowerCase().replace(/[^a-z0-9]/g, '_');
         for (const [key, value] of Object.entries(extractedFieldValues)) {
-          if (value && (
+          if (value && value.trim() && (
             key.toLowerCase() === normalizedFieldName ||
             key.toLowerCase().includes(normalizedFieldName) ||
             normalizedFieldName.includes(key.toLowerCase())
           )) {
-            mappings[fieldName] = value;
-            console.log(`✅ Mapped field "${fieldName}" -> "${value}" (direct match with "${key}")`);
-            mapped = true;
-            break;
+            return value.trim();
           }
         }
+        
+        return undefined;
+      };
+      
+      // Try to get best value for this field
+      const bestValue = getBestValueForField(fieldName);
+      
+      if (bestValue) {
+        mappings[fieldName] = bestValue;
+        console.log(`✅ Mapped field "${fieldName}" -> "${bestValue}"`);
+        mapped = true;
       }
       
       if (!mapped) {
