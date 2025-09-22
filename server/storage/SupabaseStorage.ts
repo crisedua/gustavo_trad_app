@@ -51,7 +51,16 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('templates')
       .insert({
-        ...insertTemplate,
+        name: insertTemplate.name,
+        description: insertTemplate.description,
+        file_path: insertTemplate.filePath,
+        is_auto_created: insertTemplate.isAutoCreated,
+        source_document_path: insertTemplate.sourceDocumentPath,
+        template_type: insertTemplate.templateType,
+        detection_metadata: insertTemplate.detectionMetadata,
+        field_mappings: insertTemplate.fieldMappings,  // snake_case column
+        fieldMappings: insertTemplate.fieldMappings,   // camelCase column
+        validation_rules: insertTemplate.validationRules,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -128,8 +137,11 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('processing_jobs')
       .insert({
-        ...insertJob,
+        original_file_path: insertJob.originalFilePath,
+        user_email: insertJob.userEmail,
+        status: insertJob.status,
         extracted_data: insertJob.extractedData || {},
+        template_id: insertJob.templateId,
         extracted_field_values: insertJob.extractedFieldValues || {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -215,9 +227,20 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
 
-    // Check if default template already exists  
-    const existingDefault = await this.getTemplate("default-marriage-cert");
-    if (existingDefault) return;
+    // Check if default template already exists (by name since we can't use string ID)
+    const { data: existingTemplates, error: checkError } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('name', 'Marriage Certificate Template')
+      .eq('template_type', 'marriage_certificate')
+      .limit(1);
+      
+    if (checkError) {
+      console.error('Error checking existing templates:', checkError);
+      throw checkError;
+    }
+    
+    if (existingTemplates && existingTemplates.length > 0) return;
 
     // Add default marriage certificate template
     const defaultFieldMappings: TemplateFieldMappings = {
@@ -464,35 +487,38 @@ export class SupabaseStorage implements IStorage {
       }
     };
 
-    const defaultTemplate = {
-      id: "default-marriage-cert",
-      name: "Marriage Certificate Template",
-      description: "National Civil Registry format", 
-      filePath: "/public-objects/templates/marriage_certificate_template.pdf",
-      fieldMappings: defaultFieldMappings,
-      isAutoCreated: false,
-      sourceDocumentPath: null,
-      templateType: "marriage_certificate",
-      detectionMetadata: {
-        detectionMethod: "template_predefined",
-        confidence: 1.0,
-        totalMarkersFound: Object.keys(defaultFieldMappings).length,
-        processingTime: 0,
-        ocrAccuracy: 1.0
-      },
-      validationRules: {
-        globalRules: {
-          requireAllFields: true,
-          allowPartialFill: false,
-          formCompletionThreshold: 100
-        }
-      }
-    };
-
-    // Insert with explicit ID using upsert
-    const { error } = await supabase
+    // Insert default template (let database generate UUID)
+    console.log('Inserting default template with field mappings:', Object.keys(defaultFieldMappings).length, 'fields');
+    
+    const { data, error } = await supabase
       .from('templates')
-      .upsert(defaultTemplate, { onConflict: 'id' });
+      .insert({
+        name: "Marriage Certificate Template",
+        description: "National Civil Registry format", 
+        file_path: "/public-objects/templates/marriage_certificate_template.pdf",
+        field_mappings: defaultFieldMappings,     // snake_case column
+        fieldMappings: defaultFieldMappings,      // camelCase column
+        is_auto_created: false,
+        source_document_path: null,
+        template_type: "marriage_certificate",
+        detection_metadata: {
+          detectionMethod: "template_predefined",
+          confidence: 1.0,
+          totalMarkersFound: Object.keys(defaultFieldMappings).length,
+          processingTime: 0,
+          ocrAccuracy: 1.0
+        },
+        validation_rules: {
+          globalRules: {
+            requireAllFields: true,
+            allowPartialFill: false,
+            formCompletionThreshold: 100
+          }
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select();
 
     if (error) {
       console.error('Error creating default template:', error);
