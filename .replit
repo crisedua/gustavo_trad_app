@@ -14,7 +14,7 @@ run = ["npm", "run", "start"]
 PORT = "5000"
 
 [agent]
-integrations = ["javascript_database:1.0.0"]
+integrations = ["javascript_database:1.0.0", "javascript_supabase:1.0.0"]
 
 [workflows]
 runButton = "Project"
@@ -42,12 +42,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 33977
-externalPort = 3002
+localPort = 33383
+externalPort = 3003
 
 [[ports]]
-localPort = 36203
-externalPort = 3003
+localPort = 33977
+externalPort = 3002
 
 [[ports]]
 localPort = 39441
