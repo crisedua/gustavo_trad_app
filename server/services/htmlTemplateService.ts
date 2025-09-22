@@ -53,7 +53,22 @@ export class HTMLTemplateService {
   async convertHTMLToPDF(htmlContent: string): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox', 
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-web-security'
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
     });
     
     try {
