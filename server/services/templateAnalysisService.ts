@@ -566,45 +566,70 @@ Document excerpt: ${fullText.substring(0, 1000)}...`;
     for (const analysis of fieldAnalyses) {
       const instances: FieldInstance[] = [];
       
-      // Create instances for each marker
-      for (const marker of analysis.markers) {
-        const vertices = marker.boundingBox.vertices;
-        if (vertices.length >= 4) {
-          // Calculate bounding rectangle from vertices
-          const xCoords = vertices.map(v => v.x);
-          const yCoords = vertices.map(v => v.y);
-          const minX = Math.min(...xCoords);
-          const minY = Math.min(...yCoords);
-          const maxX = Math.max(...xCoords);
-          const maxY = Math.max(...yCoords);
-          
-          const instance: FieldInstance = {
-            coordinates: {
-              page: marker.boundingBox.page,
-              rect: {
-                x: minX,
-                y: minY, // Note: This may need conversion from top-left to bottom-left origin
-                width: maxX - minX,
-                height: maxY - minY
+      // Create instances for each marker (visual marker detection)
+      if (analysis.markers.length > 0) {
+        for (const marker of analysis.markers) {
+          const vertices = marker.boundingBox.vertices;
+          if (vertices.length >= 4) {
+            // Calculate bounding rectangle from vertices
+            const xCoords = vertices.map(v => v.x);
+            const yCoords = vertices.map(v => v.y);
+            const minX = Math.min(...xCoords);
+            const minY = Math.min(...yCoords);
+            const maxX = Math.max(...xCoords);
+            const maxY = Math.max(...yCoords);
+            
+            const instance: FieldInstance = {
+              coordinates: {
+                page: marker.boundingBox.page,
+                rect: {
+                  x: minX,
+                  y: minY, // Note: This may need conversion from top-left to bottom-left origin
+                  width: maxX - minX,
+                  height: maxY - minY
+                },
+                rotation: 0,
+                units: 'pdf_points',
+                origin: 'bottom-left'
               },
-              rotation: 0,
-              units: 'pdf_points',
-              origin: 'bottom-left'
-            },
-            detectionConfidence: marker.confidence,
-            detectionMethod: `pattern_${marker.pattern}`,
-            ocrText: marker.text
-          };
-          
-          instances.push(instance);
+              detectionConfidence: marker.confidence,
+              detectionMethod: `pattern_${marker.pattern}`,
+              ocrText: marker.text
+            };
+            
+            instances.push(instance);
+          }
         }
+      } else {
+        // For PDF form fields (no visual markers), create a single instance
+        const instance: FieldInstance = {
+          coordinates: {
+            page: 1, // Default to page 1
+            rect: {
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 20
+            },
+            rotation: 0,
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: analysis.confidence,
+          detectionMethod: 'pdf_form_field',
+          ocrText: analysis.fieldName
+        };
+        
+        instances.push(instance);
       }
       
       // Create field definition
       const fieldDefinition: FieldDefinition = {
         type: analysis.fieldType,
         label: analysis.label,
-        description: `Auto-detected field from ${analysis.markers.length} marker(s)`,
+        description: analysis.markers.length > 0 
+          ? `Auto-detected field from ${analysis.markers.length} marker(s)`
+          : `PDF form field: ${analysis.fieldName}`,
         validation: this.generateValidationRules(analysis),
         displayOptions: this.generateDisplayOptions(analysis)
       };
@@ -613,7 +638,9 @@ Document excerpt: ${fullText.substring(0, 1000)}...`;
       const detectionSummary: DetectionSummary = {
         totalInstancesFound: instances.length,
         averageConfidence: analysis.confidence,
-        detectionMethod: `template_analysis_${analysis.markers[0]?.pattern || 'unknown'}`,
+        detectionMethod: analysis.markers.length > 0 
+          ? `template_analysis_${analysis.markers[0].pattern}` 
+          : 'pdf_form_field',
         conflictingInstances: false
       };
       
