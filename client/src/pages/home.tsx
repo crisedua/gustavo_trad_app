@@ -78,12 +78,14 @@ export default function Home() {
             </Button>
           </Link>
           
+          {/* Hidden: Manage Templates button
           <Link href="/admin/templates">
             <Button variant="outline" size="lg" className="w-full sm:w-auto" data-testid="button-manage-templates">
               <Settings className="w-5 h-5 mr-2" />
               Manage Templates
             </Button>
           </Link>
+          */}
         </div>
 
         {/* Process Overview */}
