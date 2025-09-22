@@ -124,7 +124,7 @@ export class TemplateAnalysisService {
   }
 
   /**
-   * Main entry point for template analysis
+   * Main entry point for template analysis - Enhanced with PDF form field detection
    */
   async analyzeTemplate(filePath: string): Promise<TemplateAnalysisResult> {
     const startTime = Date.now();
@@ -136,24 +136,45 @@ export class TemplateAnalysisService {
       const { fullText, detailedResults } = await this.extractDetailedOCRData(filePath);
       console.log('✅ OCR extraction completed, text length:', fullText.length);
       
-      // Step 2: Detect markers with position data
-      const markers = await this.detectMarkersWithPositions(detailedResults);
-      console.log('✅ Marker detection completed, found:', markers.length, 'markers');
+      // Step 2: Enhanced field detection - try PDF form fields first for PDFs
+      let fieldAnalyses: FieldAnalysis[] = [];
+      let totalFieldsFound = 0;
       
-      // Step 3: Analyze fields and generate names
-      const fieldAnalyses = await this.analyzeFields(markers, fullText);
+      if (filePath.toLowerCase().endsWith('.pdf')) {
+        console.log('📋 Attempting PDF form field detection...');
+        const pdfFormFields = await this.detectPDFFormFields(filePath);
+        
+        if (pdfFormFields.length > 0) {
+          console.log(`✅ PDF form field detection found ${pdfFormFields.length} actual form fields`);
+          fieldAnalyses = await this.analyzeFormFields(pdfFormFields, fullText);
+          totalFieldsFound = pdfFormFields.length;
+        } else {
+          console.log('⚠️ No PDF form fields found, falling back to visual marker detection');
+          const markers = await this.detectMarkersWithPositions(detailedResults);
+          console.log('✅ Marker detection completed, found:', markers.length, 'visual markers');
+          fieldAnalyses = await this.analyzeFields(markers, fullText);
+          totalFieldsFound = markers.length;
+        }
+      } else {
+        // Non-PDF files: use traditional marker detection
+        const markers = await this.detectMarkersWithPositions(detailedResults);
+        console.log('✅ Marker detection completed, found:', markers.length, 'markers');
+        fieldAnalyses = await this.analyzeFields(markers, fullText);
+        totalFieldsFound = markers.length;
+      }
+      
       console.log('✅ Field analysis completed, identified:', fieldAnalyses.length, 'fields');
       
-      // Step 4: Generate field mappings structure
+      // Step 3: Generate field mappings structure
       const fieldMappings = await this.generateFieldMappings(fieldAnalyses);
       console.log('✅ Field mappings generated');
       
-      // Step 5: Create detection metadata
-      const detectionMetadata = this.createDetectionMetadata(markers, fieldAnalyses, startTime);
+      // Step 4: Create detection metadata
+      const detectionMetadata = this.createDetectionMetadata([], fieldAnalyses, startTime);
       
-      // Step 6: Generate analysis report
+      // Step 5: Generate analysis report
       const analysisReport = {
-        totalMarkersFound: markers.length,
+        totalMarkersFound: totalFieldsFound,
         fieldsIdentified: fieldAnalyses.length,
         averageConfidence: fieldAnalyses.length > 0 
           ? fieldAnalyses.reduce((sum, f) => sum + f.confidence, 0) / fieldAnalyses.length 
@@ -1025,5 +1046,126 @@ Document excerpt: ${fullText.substring(0, 1000)}...`;
       // If inspection fails, fall back to extension-based detection
       return false;
     }
+  }
+
+  /**
+   * Detect actual PDF form fields from PDF file structure
+   */
+  private async detectPDFFormFields(filePath: string): Promise<string[]> {
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Resolve the file path
+      let resolvedPath = filePath;
+      if (filePath.startsWith('/') && !filePath.startsWith('/home') && !filePath.startsWith('/usr')) {
+        resolvedPath = path.join(process.cwd(), filePath.substring(1));
+      }
+      
+      console.log('🔍 Scanning PDF for form fields:', resolvedPath.substring(0, 50) + '...');
+      
+      // Read and load the PDF
+      const pdfBytes = fs.readFileSync(resolvedPath);
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      
+      // Get form fields
+      const form = pdfDoc.getForm();
+      const fields = form.getFields();
+      
+      const fieldNames = fields.map(field => field.getName());
+      
+      console.log(`📋 Found ${fieldNames.length} PDF form fields:`, fieldNames.slice(0, 10).join(', ') + (fieldNames.length > 10 ? '...' : ''));
+      
+      return fieldNames;
+      
+    } catch (error) {
+      console.error('Error detecting PDF form fields:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Analyze PDF form fields and create field analyses
+   */
+  private async analyzeFormFields(formFieldNames: string[], fullText: string): Promise<FieldAnalysis[]> {
+    const fieldAnalyses: FieldAnalysis[] = [];
+    
+    for (const fieldName of formFieldNames) {
+      // Create field analysis based on form field name
+      const analysis: FieldAnalysis = {
+        fieldName: this.sanitizeFieldName(fieldName),
+        fieldType: this.inferFieldTypeFromName(fieldName),
+        label: this.generateLabelFromFieldName(fieldName),
+        confidence: 0.95, // High confidence for actual PDF form fields
+        markers: [], // PDF form fields don't have visual markers
+        contextAnalysis: {
+          detectedLabels: [fieldName],
+          suggestedType: this.inferFieldTypeFromName(fieldName),
+          validationHints: this.generateValidationHintsFromName(fieldName)
+        }
+      };
+      
+      fieldAnalyses.push(analysis);
+    }
+    
+    console.log(`📊 Created ${fieldAnalyses.length} field analyses from PDF form fields`);
+    
+    return fieldAnalyses;
+  }
+
+  /**
+   * Sanitize field name for use as object key
+   */
+  private sanitizeFieldName(fieldName: string): string {
+    return fieldName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special characters except spaces
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
+  }
+
+  /**
+   * Infer field type from field name
+   */
+  private inferFieldTypeFromName(fieldName: string): "text" | "date" | "number" | "boolean" | "select" | "multiline_text" | "signature" {
+    const name = fieldName.toLowerCase();
+    
+    if (name.includes('year') || name.includes('date')) return 'date';
+    if (name.includes('number') || name.includes('amount') || name.includes('balance') || name.includes('total')) return 'number';
+    if (name.includes('signature')) return 'signature';
+    if (name.includes('check') || name.includes('select')) return 'select';
+    if (name.includes('multiline') || name.includes('textarea')) return 'multiline_text';
+    if (name.includes('boolean') || name.includes('checkbox')) return 'boolean';
+    
+    return 'text'; // Default to text
+  }
+
+  /**
+   * Generate human-readable label from field name
+   */
+  private generateLabelFromFieldName(fieldName: string): string {
+    return fieldName
+      .replace(/([A-Z])/g, ' $1') // Add spaces before capital letters
+      .replace(/_/g, ' ') // Replace underscores with spaces
+      .replace(/\b\w/g, l => l.toUpperCase()) // Capitalize first letter of each word
+      .trim();
+  }
+
+  /**
+   * Generate validation hints from field name
+   */
+  private generateValidationHintsFromName(fieldName: string): string[] {
+    const name = fieldName.toLowerCase();
+    const hints: string[] = [];
+    
+    if (name.includes('year')) hints.push('4-digit year format');
+    if (name.includes('email')) hints.push('valid email format');
+    if (name.includes('phone')) hints.push('phone number format');
+    if (name.includes('tax') || name.includes('nit')) hints.push('tax identification format');
+    if (name.includes('number') && !name.includes('phone')) hints.push('numeric format');
+    if (name.includes('required')) hints.push('required field');
+    
+    return hints;
   }
 }
