@@ -168,7 +168,21 @@ export class SupabaseStorage implements IStorage {
       console.error('Error creating processing job:', error);
       throw error;
     }
-    return data;
+    
+    // Map snake_case database columns to camelCase TypeScript properties
+    return {
+      id: data.id,
+      originalFilePath: data.original_file_path,
+      userEmail: data.user_email,
+      status: data.status,
+      extractedData: data.extracted_data,
+      templateId: data.template_id,
+      extractedFieldValues: data.extracted_field_values,
+      generatedDocumentPath: data.generated_document_path,
+      errorMessage: data.error_message,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async getProcessingJob(id: string): Promise<ProcessingJob | undefined> {
@@ -182,7 +196,23 @@ export class SupabaseStorage implements IStorage {
       console.error('Error fetching processing job:', error);
       return undefined;
     }
-    return data;
+    
+    if (!data) return undefined;
+    
+    // Map snake_case database columns to camelCase TypeScript properties
+    return {
+      id: data.id,
+      originalFilePath: data.original_file_path,
+      userEmail: data.user_email,
+      status: data.status,
+      extractedData: data.extracted_data,
+      templateId: data.template_id,
+      extractedFieldValues: data.extracted_field_values,
+      generatedDocumentPath: data.generated_document_path,
+      errorMessage: data.error_message,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async getProcessingJobs(): Promise<ProcessingJob[]> {
@@ -195,7 +225,23 @@ export class SupabaseStorage implements IStorage {
       console.error('Error fetching processing jobs:', error);
       return [];
     }
-    return data || [];
+    
+    if (!data) return [];
+    
+    // Map snake_case database columns to camelCase TypeScript properties  
+    return data.map(job => ({
+      id: job.id,
+      originalFilePath: job.original_file_path,
+      userEmail: job.user_email,
+      status: job.status,
+      extractedData: job.extracted_data,
+      templateId: job.template_id,
+      extractedFieldValues: job.extracted_field_values,
+      generatedDocumentPath: job.generated_document_path,
+      errorMessage: job.error_message,
+      createdAt: job.created_at,
+      updatedAt: job.updated_at
+    }));
   }
 
   async updateProcessingJob(id: string, updates: Partial<ProcessingJob>): Promise<ProcessingJob | undefined> {
