@@ -410,6 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/templates/:id", async (req, res) => {
     try {
       const templateId = req.params.id;
+      const force = req.query.force === 'true';
       
       // Check if template exists
       const template = await storage.getTemplate(templateId);
@@ -420,11 +421,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if template is being used by any processing jobs
       const jobs = await storage.getProcessingJobs();
       const templatesInUse = jobs.filter(job => job.templateId === templateId);
-      if (templatesInUse.length > 0) {
+      
+      if (templatesInUse.length > 0 && !force) {
         return res.status(400).json({ 
           error: "Cannot delete template that is being used by processing jobs",
-          jobsCount: templatesInUse.length
+          jobsCount: templatesInUse.length,
+          message: "Add ?force=true to delete template and cleanup associated jobs"
         });
+      }
+      
+      // If force delete, clean up associated jobs first
+      if (force && templatesInUse.length > 0) {
+        console.log(`🗑️ Force deleting template ${templateId} and cleaning up ${templatesInUse.length} associated jobs`);
+        
+        for (const job of templatesInUse) {
+          try {
+            await storage.deleteProcessingJob(job.id);
+            console.log(`✅ Deleted job ${job.id}`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to delete job ${job.id}:`, error);
+          }
+        }
+        
+        console.log(`✅ Cleaned up ${templatesInUse.length} associated processing jobs`);
       }
 
       // Delete the template
