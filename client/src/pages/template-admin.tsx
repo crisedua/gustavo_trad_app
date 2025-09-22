@@ -82,7 +82,20 @@ export default function TemplateAdmin() {
       });
     },
     onError: (error: any, { templateId, force }) => {
-      const errorData = error.response?.data || error;
+      let errorData: any = {};
+      
+      // Parse error response - the error message contains JSON if it's from our API
+      try {
+        if (error.message && error.message.includes(':')) {
+          const jsonPart = error.message.split(': ', 2)[1];
+          if (jsonPart && (jsonPart.startsWith('{') || jsonPart.startsWith('['))) {
+            errorData = JSON.parse(jsonPart);
+          }
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse error response:', parseError);
+        errorData = { message: error.message };
+      }
       
       // Check if error is due to associated jobs
       if (errorData.jobsCount && !force) {
