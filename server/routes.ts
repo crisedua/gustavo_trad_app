@@ -563,7 +563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobData = insertProcessingJobSchema.parse({
         originalFilePath,
         templateId: templateId || null,
-        status: 'uploading',
+        status: 'pending_review',
         extractedData: {},
         extractedFieldValues: {}
       });
@@ -571,10 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const job = await storage.createProcessingJob(jobData);
       res.status(201).json(job);
 
-      // Start processing asynchronously
-      processDocument(job.id).catch(error => {
-        console.error("Document processing failed:", error);
-      });
+      // Job created with 'pending_review' status - no automatic processing
 
     } catch (error) {
       console.error("Error creating processing job:", error);

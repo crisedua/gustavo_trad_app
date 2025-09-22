@@ -43,6 +43,7 @@ interface ProcessingJob {
 }
 
 const statusSteps = [
+  { key: 'pending_review', label: 'Pending Admin Review', icon: Clock },
   { key: 'uploading', label: 'File Upload', icon: Upload },
   { key: 'ocr', label: 'OCR Text Extraction', icon: FileText },
   { key: 'extraction', label: 'AI Field Extraction', icon: Settings },
@@ -93,8 +94,8 @@ export default function DocumentProcessor() {
       setCurrentJobId(job.id);
       queryClient.invalidateQueries({ queryKey: ['/api/processing-jobs'] });
       toast({
-        title: "Processing Started",
-        description: "Your document is being processed...",
+        title: "Document Uploaded",
+        description: "Your document has been uploaded and is awaiting admin review.",
       });
     },
     onError: (error) => {
