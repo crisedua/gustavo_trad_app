@@ -409,19 +409,47 @@ export class MemStorage implements IStorage {
 }
 
 import { DatabaseStorage } from './storage/DatabaseStorage.js';
+import { SupabaseStorage } from './storage/SupabaseStorage.js';
 
-// Try database storage, fallback to memory if connection fails  
+// Try Supabase storage first, then database storage, then fallback to memory
 let storage: any;
-try {
-  storage = new DatabaseStorage();
-  // Test the connection by trying to initialize default templates
-  storage.initializeDefaultTemplates().catch(() => {
-    console.warn('Database connection failed, falling back to memory storage');
-    storage = new MemStorage();
-  });
-} catch (error) {
-  console.warn('Database initialization failed, using memory storage:', error);
+
+async function initializeStorage() {
+  // Try Supabase storage first if environment variables are available
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      console.log('Initializing Supabase storage...');
+      storage = new SupabaseStorage();
+      await storage.initializeDefaultTemplates();
+      console.log('Supabase storage initialized successfully');
+      return;
+    } catch (error) {
+      console.warn('Supabase storage initialization failed:', error);
+    }
+  }
+
+  // Fallback to direct database storage
+  if (process.env.DATABASE_URL) {
+    try {
+      console.log('Attempting database storage...');
+      storage = new DatabaseStorage();
+      await storage.initializeDefaultTemplates();
+      console.log('Database storage initialized successfully');
+      return;
+    } catch (error) {
+      console.warn('Database storage initialization failed:', error);
+    }
+  }
+
+  // Final fallback to memory storage
+  console.log('Using memory storage as fallback');
   storage = new MemStorage();
 }
+
+// Initialize storage
+initializeStorage().catch((error) => {
+  console.error('Storage initialization error:', error);
+  storage = new MemStorage();
+});
 
 export { storage };
