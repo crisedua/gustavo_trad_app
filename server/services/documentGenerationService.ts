@@ -58,9 +58,16 @@ export class DocumentGenerationService {
         
         let fieldsFilledCount = 0;
         
-        // Enhanced field mapping for DIAN tax forms
+        // Enhanced field mapping for DIAN tax forms - match actual PDF form field names
         const fieldMappings = {
-          // Basic mappings
+          // Exact matches for detected form fields
+          'YEAR': extractedFieldValues.year || '2023',
+          'FIRSTSURNAME': extractedFieldValues.first_surname || '',
+          'SECONDSURNAME': extractedFieldValues.second_surname || '',
+          'FIRST NAME': extractedFieldValues.first_name || '',
+          'Text Field0': extractedFieldValues.tax_id || extractedFieldValues.prior_year_return_number || '',
+          
+          // Common variations (in case PDF has different field names)
           'year': extractedFieldValues.year || '2023',
           'tax_id': extractedFieldValues.tax_id || extractedFieldValues.number || '',
           'nit': extractedFieldValues.tax_id || extractedFieldValues.number || '',
@@ -70,7 +77,7 @@ export class DocumentGenerationService {
           'other_names': extractedFieldValues.other_names || '',
           'form_number': extractedFieldValues.tax_id || extractedFieldValues.number || '',
           
-          // Common field name variations
+          // Additional variations
           'Year': extractedFieldValues.year || '2023',
           'Tax_ID': extractedFieldValues.tax_id || extractedFieldValues.number || '',
           'NIT': extractedFieldValues.tax_id || extractedFieldValues.number || '',
@@ -80,7 +87,7 @@ export class DocumentGenerationService {
           'Other_Names': extractedFieldValues.other_names || '',
           'Form_Number': extractedFieldValues.tax_id || extractedFieldValues.number || '',
           
-          // Numbered field variations (common in PDF forms)
+          // Numbered field variations
           'field_1': extractedFieldValues.year || '2023',
           'field_2': extractedFieldValues.tax_id || extractedFieldValues.number || '',
           'field_3': extractedFieldValues.first_surname || '',
