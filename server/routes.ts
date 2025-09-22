@@ -663,6 +663,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual OCR and field processing endpoint
+  app.post("/api/processing-jobs/:id/process", async (req, res) => {
+    try {
+      const job = await storage.getProcessingJob(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: "Processing job not found" });
+      }
+
+      // Update status to OCR processing
+      await storage.updateProcessingJob(job.id, { status: 'ocr' });
+
+      // Perform OCR on the original document
+      console.log('Starting OCR processing for job:', job.id);
+      const ocrResult = await ocrService.extractTextFromFile(job.originalFilePath);
+      
+      // Update job with OCR results
+      await storage.updateProcessingJob(job.id, { 
+        status: 'extraction'
+      });
+
+      // If a template is selected, perform field extraction
+      if (job.templateId) {
+        console.log('Starting field extraction for job:', job.id, 'with template:', job.templateId);
+        
+        const template = await storage.getTemplate(job.templateId);
+        if (template) {
+          // Extract field values using the template
+          const extractedFields = await fieldExtractionService.extractFieldsForTemplate(
+            ocrResult,
+            template
+          );
+          
+          // Update job with extracted field values
+          await storage.updateProcessingJob(job.id, {
+            status: 'mapping',
+            extractedData: extractedFields,
+            extractedFieldValues: extractedFields
+          });
+        }
+      }
+
+      // Update final status to pending_review for admin to verify
+      await storage.updateProcessingJob(job.id, { status: 'pending_review' });
+
+      // Fetch and return updated job
+      const updatedJob = await storage.getProcessingJob(job.id);
+      res.json(updatedJob);
+
+    } catch (error) {
+      console.error("Error processing job:", error);
+      
+      // Update job with error
+      await storage.updateProcessingJob(req.params.id, {
+        status: 'error',
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      
+      res.status(500).json({ error: "Failed to process job" });
+    }
+  });
+
   // Delete processing job
   app.delete("/api/processing-jobs/:id", async (req, res) => {
     try {
