@@ -15,45 +15,100 @@ export interface ExtractedField {
 export class FieldExtractionService {
   
   /**
-   * Extract field names from template field mappings for use with extraction
+   * Extract field names from template - use actual PDF form fields for manual templates
    */
-  getFieldNamesFromTemplate(template: Template): string[] {
+  async getFieldNamesFromTemplate(template: Template): Promise<string[]> {
+    // For manual templates, get the actual PDF form field names
+    if (!template.isAutoCreated) {
+      try {
+        const pdfFormFields = await this.getPDFFormFieldNames(template);
+        if (pdfFormFields.length > 0) {
+          console.log(`📋 Using PDF form field names for extraction: ${pdfFormFields.join(', ')}`);
+          return pdfFormFields;
+        }
+      } catch (error) {
+        console.warn('Failed to get PDF form fields, falling back to fieldMappings:', error);
+      }
+    }
+    
+    // Fallback to fieldMappings for auto-created templates or if PDF scan fails
     if (!template.fieldMappings) {
       return [];
     }
     
-    // For auto-created templates, extract field names from the fieldMappings
-    if (template.isAutoCreated) {
-      return Object.keys(template.fieldMappings);
-    }
-    
-    // For manual templates, also extract from fieldMappings
     return Object.keys(template.fieldMappings);
+  }
+  
+  /**
+   * Get actual form field names from PDF template
+   */
+  async getPDFFormFieldNames(template: Template): Promise<string[]> {
+    const { PDFDocument } = await import('pdf-lib');
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    try {
+      // Resolve the template path
+      let resolvedPath = template.filePath;
+      if (template.filePath.startsWith('/') && !template.filePath.startsWith('/home') && !template.filePath.startsWith('/usr')) {
+        resolvedPath = path.join(process.cwd(), template.filePath.substring(1));
+      }
+      
+      // Read and load the PDF
+      const templateBytes = fs.readFileSync(resolvedPath);
+      const pdfDoc = await PDFDocument.load(templateBytes);
+      
+      // Get form field names
+      const form = pdfDoc.getForm();
+      const fields = form.getFields();
+      
+      return fields.map(field => field.getName());
+    } catch (error) {
+      console.error('Error reading PDF form fields:', error);
+      return [];
+    }
   }
   
   /**
    * Enhanced extraction that works with both manual and auto-created templates
    */
   async extractFieldsForTemplate(ocrText: string, template: Template): Promise<Record<string, string>> {
-    const templateFields = this.getFieldNamesFromTemplate(template);
+    const templateFields = await this.getFieldNamesFromTemplate(template);
     return await this.extractFields(ocrText, templateFields);
   }
   
   async extractFields(ocrText: string, templateFields?: string[]): Promise<Record<string, string>> {
     try {
-      const systemPrompt = `You are an expert document analyzer. Extract key information from the provided OCR text and structure it as JSON.
+      let systemPrompt = '';
+      
+      if (templateFields && templateFields.length > 0) {
+        // Focused extraction for specific PDF form fields
+        systemPrompt = `You are an expert document analyzer. Extract ONLY data that corresponds to these specific PDF form fields: ${templateFields.join(', ')}
 
-Common field patterns to look for:
-- Names (party_a_names, party_b_names, authorized_name, etc.)
-- Surnames (party_a_surnames, party_b_surnames, etc.) 
-- Document numbers and types (document_number, document_type, serial_indicator, etc.)
-- Dates (marriage_date, birth_date, registration_date, issue_date, etc.)
-- Locations (country, department, municipality, registry_office, etc.)
-- Official information (authorized_title, office_type, marriage_type, etc.)
+For each form field, look for the most relevant data in the OCR text:
 
-${templateFields ? `Focus on these specific template fields: ${templateFields.join(', ')}` : ''}
+FIELD MAPPING GUIDE:
+- YEAR/Year/año: Look for 4-digit years (like 2023, 2022, etc.)
+- FIRSTSURNAME/primer_apellido: Look for first/primary surname in Spanish documents  
+- SECONDSURNAME/segundo_apellido: Look for second surname in Spanish documents
+- FIRST NAME/primer_nombre: Look for first given name
+- OTHER NAMES/otros_nombres: Look for additional given names
+- Text Field0/NIT/tax_id: Look for tax identification numbers, NIT numbers, or document IDs
+
+EXTRACTION RULES:
+1. Return ONLY data for the exact form field names provided: ${templateFields.join(', ')}
+2. Use exact form field names as JSON keys
+3. If a form field has no corresponding data in the text, omit it completely
+4. Focus on extracting personal information (names, years, IDs) rather than financial data
+5. For Spanish documents, map Spanish field names to English form field names when possible
+
+Return a JSON object with form field names as keys and extracted values as strings.`;
+      } else {
+        // Fallback prompt for when no template fields are provided
+        systemPrompt = `You are an expert document analyzer. Extract key information from the provided OCR text and structure it as JSON.
 
 Return ONLY a JSON object with field names as keys and extracted values as strings. If a field cannot be found, omit it from the response.`;
+      }
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
