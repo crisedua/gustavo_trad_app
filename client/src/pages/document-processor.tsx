@@ -384,6 +384,7 @@ export default function DocumentProcessor() {
                   </div>
                 )}
                 
+                {/* Hidden: Manage Templates button
                 <div className="text-center">
                   <Link href="/admin/templates">
                     <Button variant="outline" size="sm">
@@ -391,6 +392,7 @@ export default function DocumentProcessor() {
                     </Button>
                   </Link>
                 </div>
+                */}
               </div>
             </CardContent>
           </Card>
