@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import DocumentProcessor from "@/pages/document-processor";
 import TemplateAdmin from "@/pages/template-admin";
+import AdminRequests from "@/pages/admin-requests";
 
 function Router() {
   return (
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/process" component={DocumentProcessor} />
       <Route path="/admin/templates" component={TemplateAdmin} />
+      <Route path="/admin/requests" component={AdminRequests} />
       <Route component={NotFound} />
     </Switch>
   );

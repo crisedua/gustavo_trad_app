@@ -663,6 +663,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete processing job
+  app.delete("/api/processing-jobs/:id", async (req, res) => {
+    try {
+      const jobId = req.params.id;
+      
+      // Check if job exists
+      const job = await storage.getProcessingJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Processing job not found" });
+      }
+
+      // Delete the job
+      const deleted = await storage.deleteProcessingJob(jobId);
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete processing job" });
+      }
+
+      res.json({ success: true, message: "Processing job deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting processing job:", error);
+      res.status(500).json({ error: "Failed to delete processing job" });
+    }
+  });
+
   // Async document processing function
   async function processDocument(jobId: string) {
     try {
