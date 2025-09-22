@@ -408,5 +408,20 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Temporarily use MemStorage while fixing Supabase connection
-export const storage = new MemStorage();
+import { DatabaseStorage } from './storage/DatabaseStorage.js';
+
+// Try database storage, fallback to memory if connection fails  
+let storage: any;
+try {
+  storage = new DatabaseStorage();
+  // Test the connection by trying to initialize default templates
+  storage.initializeDefaultTemplates().catch(() => {
+    console.warn('Database connection failed, falling back to memory storage');
+    storage = new MemStorage();
+  });
+} catch (error) {
+  console.warn('Database initialization failed, using memory storage:', error);
+  storage = new MemStorage();
+}
+
+export { storage };
