@@ -67,6 +67,11 @@ export class OCRService {
 
   async extractTextFromFile(filePath: string): Promise<string> {
     try {
+      // Validate filePath is not undefined/null/empty
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error(`Invalid file path provided: ${filePath}. File path cannot be undefined, null, or empty.`);
+      }
+      
       console.log('Processing file for OCR:', filePath.substring(0, 50) + '...');
       
       // Check if filePath is a URL (signed URL from Google Cloud Storage or localhost)
