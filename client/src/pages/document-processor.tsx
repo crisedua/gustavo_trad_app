@@ -373,33 +373,6 @@ export default function DocumentProcessor() {
                         </div>
                       </div>
                     )}
-                    
-                    {/* Show field names for better transparency */}
-                    {showAllFields && selectedTemplate.fieldMappings && (
-                      <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-600">
-                        <div className="text-xs font-medium text-gray-900 dark:text-white mb-2">Template Fields:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(selectedTemplate.fieldMappings).map(([fieldName, mapping]) => (
-                            <span 
-                              key={fieldName} 
-                              className="text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-2 py-1 rounded"
-                              title={mapping.fieldDefinition?.label || fieldName}
-                            >
-                              {mapping.fieldDefinition?.label || fieldName}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="mt-2 text-center">
-                      <button
-                        onClick={() => setShowAllFields(!showAllFields)}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        {showAllFields ? 'Hide' : 'Show'} Field Details
-                      </button>
-                    </div>
                   </div>
                 )}
                 
