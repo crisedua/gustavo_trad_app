@@ -40,7 +40,7 @@ export class FieldExtractionService {
   }
   
   /**
-   * Get actual form field names from PDF template
+   * Get comprehensive field names from PDF template - both fillable fields and numbered positions
    */
   async getPDFFormFieldNames(template: Template): Promise<string[]> {
     const { PDFDocument } = await import('pdf-lib');
@@ -58,13 +58,84 @@ export class FieldExtractionService {
       const templateBytes = fs.readFileSync(resolvedPath);
       const pdfDoc = await PDFDocument.load(templateBytes);
       
-      // Get form field names
+      // Method 1: Get actual fillable form field names
       const form = pdfDoc.getForm();
-      const fields = form.getFields();
+      const fillableFields = form.getFields().map(field => field.getName());
       
-      return fields.map(field => field.getName());
+      console.log(`🔍 Found ${fillableFields.length} fillable form fields:`, fillableFields.join(', '));
+      
+      // Method 2: Extract numbered field positions from document text
+      const numberedFields = await this.extractNumberedFieldsFromPDF(resolvedPath);
+      
+      console.log(`📊 Found ${numberedFields.length} numbered field positions:`, numberedFields.slice(0, 10).join(', ') + (numberedFields.length > 10 ? '...' : ''));
+      
+      // Combine both approaches for comprehensive field detection
+      const allFields = Array.from(new Set([...fillableFields, ...numberedFields]));
+      
+      console.log(`✅ Total comprehensive fields detected: ${allFields.length}`);
+      
+      return allFields;
     } catch (error) {
       console.error('Error reading PDF form fields:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Extract numbered field positions from PDF text content
+   */
+  async extractNumberedFieldsFromPDF(pdfPath: string): Promise<string[]> {
+    const { OCRService } = await import('./ocrService');
+    const fs = await import('fs');
+    
+    try {
+      const ocrService = new OCRService();
+      const extractedText = await ocrService.extractTextFromFile(pdfPath);
+      
+      // Extract numbered fields from text (1. Year, 4. Form Number, etc.)
+      const numberedFieldPattern = /\b(\d+)\s*\.[\s]*([^\d]{1,50}?)(?=\s*\d+\.|$|\n)/g;
+      const namedFieldPattern = /\b(Year|Form Number|Tax Identification|First Surname|Second Surname|First Name|Other Names|Regional Office|Economic Activity|Code|Assets|Liabilities|Net Worth|Income|Deductions|Balance|Penalties|Dependents|Overpayment)\b/gi;
+      
+      const numberedFields: string[] = [];
+      const namedFields: string[] = [];
+      
+      // Extract numbered fields (1. Year, 4. Form Number, etc.)
+      let match;
+      while ((match = numberedFieldPattern.exec(extractedText)) !== null) {
+        const fieldNumber = match[1];
+        const fieldName = match[2].trim().replace(/[^a-zA-Z0-9\s]/g, '').trim();
+        if (fieldName && fieldName.length > 0) {
+          numberedFields.push(`field_${fieldNumber}_${fieldName.toLowerCase().replace(/\s+/g, '_')}`);
+        }
+      }
+      
+      // Extract named fields
+      let namedMatch;
+      while ((namedMatch = namedFieldPattern.exec(extractedText)) !== null) {
+        namedFields.push(namedMatch[1].toLowerCase().replace(/\s+/g, '_'));
+      }
+      
+      // Generate common tax form fields based on DIAN structure
+      const commonTaxFields = [
+        'year', 'form_number', 'tax_identification_number', 'nit',
+        'first_surname', 'second_surname', 'first_name', 'other_names',
+        'regional_office_code', 'main_economic_activity', 'correction_code',
+        'prior_year_return', 'partial_year_return', 'one_percent_purchases',
+        'total_gross_assets', 'liabilities_debts', 'net_worth',
+        'gross_income', 'non_taxable_income', 'allowable_costs_deductions',
+        'taxable_income', 'exempt_income', 'total_deductions',
+        'ordinary_taxable_income', 'net_loss', 'loss_carryovers',
+        'ordinary_net_income', 'presumptive_income', 'capital_gains',
+        'income_tax_due', 'foreign_tax_credit', 'total_tax_due',
+        'balance_tax_due', 'penalties', 'total_balance_due',
+        'total_overpayment', 'number_dependents', 'addition_dependents'
+      ];
+      
+      // Combine all field types
+      return Array.from(new Set([...numberedFields, ...namedFields, ...commonTaxFields]));
+      
+    } catch (error) {
+      console.warn('Error extracting numbered fields from PDF:', error);
       return [];
     }
   }
@@ -83,24 +154,26 @@ export class FieldExtractionService {
       
       if (templateFields && templateFields.length > 0) {
         // Focused extraction for specific PDF form fields
-        systemPrompt = `You are an expert document analyzer. Extract ONLY data that corresponds to these specific PDF form fields: ${templateFields.join(', ')}
+        const fieldList = templateFields.join(', ');
+        systemPrompt = `You are an expert document analyzer. Extract ONLY data that corresponds to these specific PDF form fields: ${fieldList}
 
 For each form field, look for the most relevant data in the OCR text:
 
 FIELD MAPPING GUIDE:
-- YEAR/Year/año: Look for 4-digit years (like 2023, 2022, etc.)
-- FIRSTSURNAME/primer_apellido: Look for first/primary surname in Spanish documents  
-- SECONDSURNAME/segundo_apellido: Look for second surname in Spanish documents
-- FIRST NAME/primer_nombre: Look for first given name
-- OTHER NAMES/otros_nombres: Look for additional given names
-- Text Field0/NIT/tax_id: Look for tax identification numbers, NIT numbers, or document IDs
+- YEAR/Year/año/year/form_number: Look for 4-digit years (like 2023, 2022, etc.)
+- FIRSTSURNAME/primer_apellido/first_surname: Look for first/primary surname in Spanish documents  
+- SECONDSURNAME/segundo_apellido/second_surname: Look for second surname in Spanish documents
+- FIRST NAME/primer_nombre/first_name: Look for first given name
+- OTHER NAMES/otros_nombres/other_names: Look for additional given names
+- Text Field0/NIT/tax_id/tax_identification_number: Look for tax identification numbers, NIT numbers, or document IDs
+- field_1_*,field_4_*,field_5_*: Look for data in numbered positions (1. Year, 4. Form Number, 5. Tax ID, etc.)
+- Assets/Liabilities/Income fields: Look for financial amounts and calculations
 
-EXTRACTION RULES:
-1. Return ONLY data for the exact form field names provided: ${templateFields.join(', ')}
 2. Use exact form field names as JSON keys
 3. If a form field has no corresponding data in the text, omit it completely
-4. Focus on extracting personal information (names, years, IDs) rather than financial data
+4. Extract both personal information (names, years, IDs) and financial data when fields exist
 5. For Spanish documents, map Spanish field names to English form field names when possible
+6. For numbered fields (field_1_*, field_4_*, etc.), extract the data from corresponding numbered positions
 
 Return a JSON object with form field names as keys and extracted values as strings.`;
       } else {
@@ -161,7 +234,7 @@ Only include mappings where you're confident about the match. If no good match e
    * Enhanced field mapping that includes context from auto-created templates
    */
   async enhanceFieldMappingForTemplate(extractedData: Record<string, string>, template: Template): Promise<Record<string, string>> {
-    const templateFields = this.getFieldNamesFromTemplate(template);
+    const templateFields = await this.getFieldNamesFromTemplate(template);
     
     // Add additional context for auto-created templates
     let enhancedPrompt = '';
