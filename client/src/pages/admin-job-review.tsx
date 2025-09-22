@@ -56,6 +56,7 @@ interface Template {
 interface ProcessingJob {
   id: string;
   originalFilePath: string;
+  userEmail: string;
   status: string;
   extractedData?: Record<string, string>;
   templateId?: string;
@@ -369,6 +370,16 @@ export default function AdminJobReview() {
                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid="text-filepath">
                   {job.originalFilePath}
                 </p>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">User Email</Label>
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <p className="text-sm text-gray-900 dark:text-gray-100" data-testid="text-user-email">
+                    {job.userEmail}
+                  </p>
+                </div>
               </div>
 
               <div>
