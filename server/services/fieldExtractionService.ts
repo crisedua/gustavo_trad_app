@@ -153,29 +153,58 @@ export class FieldExtractionService {
       let systemPrompt = '';
       
       if (templateFields && templateFields.length > 0) {
-        // Focused extraction for specific PDF form fields
+        // Enhanced semantic field extraction with intelligent type recognition
         const fieldList = templateFields.join(', ');
-        systemPrompt = `You are an expert document analyzer. Extract ONLY data that corresponds to these specific PDF form fields: ${fieldList}
+        systemPrompt = `You are an expert bilingual document analyzer specializing in tax forms and legal documents. Extract ONLY data that corresponds to these specific PDF form fields: ${fieldList}
 
-For each form field, look for the most relevant data in the OCR text:
+🧠 FIELD TYPE INTELLIGENCE - Understand the semantic meaning of each field:
 
-FIELD MAPPING GUIDE:
-- YEAR/Year/año/year/form_number: Look for 4-digit years (like 2023, 2022, etc.)
-- FIRSTSURNAME/primer_apellido/first_surname: Look for first/primary surname in Spanish documents  
-- SECONDSURNAME/segundo_apellido/second_surname: Look for second surname in Spanish documents
-- FIRST NAME/primer_nombre/first_name: Look for first given name
-- OTHER NAMES/otros_nombres/other_names: Look for additional given names
-- Text Field0/NIT/tax_id/tax_identification_number: Look for tax identification numbers, NIT numbers, or document IDs
-- field_1_*,field_4_*,field_5_*: Look for data in numbered positions (1. Year, 4. Form Number, 5. Tax ID, etc.)
-- Assets/Liabilities/Income fields: Look for financial amounts and calculations
+📋 PERSONAL IDENTIFICATION FIELDS:
+- "Tax Identification Number"/"NIT"/"tax_id": Look for ACTUAL tax ID numbers (longer format like "79524018 9" or "91900175066331"). DO NOT use form numbers here.
+- "Form Number"/"form_number": Look for specific form reference numbers (like "2118615051596"). This is NOT the tax ID.
+- "Year"/"year"/"año": Look for 4-digit years (2023, 2022, etc.) that represent the tax year.
 
-2. Use exact form field names as JSON keys
-3. If a form field has no corresponding data in the text, omit it completely
-4. Extract both personal information (names, years, IDs) and financial data when fields exist
-5. For Spanish documents, map Spanish field names to English form field names when possible
-6. For numbered fields (field_1_*, field_4_*, etc.), extract the data from corresponding numbered positions
+👤 NAME FIELDS (Spanish document order matters):
+- "First Surname"/"primer apellido"/"first_surname": First surname in Spanish name order (e.g., "MORENO")
+- "Second Surname"/"segundo apellido"/"second_surname": Second surname in Spanish name order (e.g., "GUTIERREZ")
+- "First Name"/"primer nombre"/"first_name": Given/first name (e.g., "HECTOR")
+- "Other Names"/"otros nombres"/"other_names": Additional given names (e.g., "ANTONIO")
 
-Return a JSON object with form field names as keys and extracted values as strings.`;
+🏢 ADMINISTRATIVE FIELDS:
+- "Regional Office Code"/"código oficina": Geographic/office codes
+- "Main Economic Activity"/"actividad económica": Business activity codes
+
+💰 FINANCIAL FIELDS (numbered 29-141):
+- "Total Gross Assets"/"activos brutos": Large monetary amounts in assets section
+- "Liabilities"/"pasivos": Debt amounts
+- "Net Worth"/"patrimonio": Net worth calculations
+- "Gross Income"/"ingresos brutos": Income amounts
+- "Taxable Income"/"renta gravable": Taxable amounts
+- "Balance Tax Due"/"saldo a pagar": Final tax amounts
+- "Penalties"/"sanciones": Penalty amounts
+
+🎯 EXTRACTION RULES:
+1. **Field Semantic Matching**: Match data based on field MEANING, not just keywords
+2. **Data Type Validation**: 
+   - Tax IDs: Look for longer numeric sequences with spaces/formatting
+   - Form Numbers: Look for specific form reference numbers (usually shorter)
+   - Names: Extract from name sections, respect Spanish naming order
+   - Financial: Look for large monetary amounts with commas/periods
+3. **Spanish-English Semantic Mapping**: 
+   - "primer apellido" → "First Surname" (not "First Name")
+   - "segundo apellido" → "Second Surname" 
+   - "primer nombre" → "First Name"
+   - "NIT" or long tax numbers → "Tax Identification Number" (not Form Number)
+4. **Context Awareness**: Use document structure and positioning to disambiguate similar data
+5. **Exact Field Names**: Use the EXACT template field names as JSON keys
+6. **Quality Control**: If uncertain about a mapping, omit it rather than guess incorrectly
+
+⚠️ CRITICAL DISTINCTIONS:
+- Form Number (like "2118615051596") ≠ Tax ID (like "79524018 9" or "91900175066331")
+- First Surname ≠ First Name (different concepts in Spanish documents)
+- Financial amounts go to numbered fields, personal data to header fields
+
+Return a JSON object with exact template field names as keys and correctly mapped values as strings.`;
       } else {
         // Fallback prompt for when no template fields are provided
         systemPrompt = `You are an expert document analyzer. Extract key information from the provided OCR text and structure it as JSON.
@@ -202,27 +231,56 @@ Return ONLY a JSON object with field names as keys and extracted values as strin
 
   async enhanceFieldMapping(extractedData: Record<string, string>, templateFields: string[]): Promise<Record<string, string>> {
     try {
-      const systemPrompt = `You are helping to map extracted document data to template fields. 
-      
-Template fields: ${templateFields.join(', ')}
-Extracted data: ${JSON.stringify(extractedData)}
+      const systemPrompt = `You are an expert bilingual document mapping specialist. Your task is to create intelligent semantic mappings between extracted document data and template fields.
 
-Create the best possible mapping between extracted data and template fields. Return a JSON object where:
-- Keys are template field names (from the template fields list)
-- Values are the most appropriate extracted values
+🎯 TEMPLATE FIELDS: ${templateFields.join(', ')}
+📄 EXTRACTED DATA: ${JSON.stringify(extractedData)}
 
-Only include mappings where you're confident about the match. If no good match exists for a template field, omit it.`;
+🧠 INTELLIGENT MAPPING STRATEGY:
+
+1. **Semantic Field Analysis**: 
+   - Analyze what each template field is asking for (Tax ID vs Form Number vs Names)
+   - Match based on field MEANING, not just string similarity
+
+2. **Data Type Recognition**:
+   - Tax IDs: Longer numbers with formatting ("79524018 9", "91900175066331")
+   - Form Numbers: Specific form references ("2118615051596")
+   - Names: Personal names in Spanish order (primer apellido, segundo apellido, primer nombre)
+   - Financial: Monetary amounts with commas/formatting
+
+3. **Spanish-English Cross-Mapping**:
+   - "primer_apellido" → "First Surname" field
+   - "segundo_apellido" → "Second Surname" field
+   - "primer_nombre" → "First Name" field
+   - "NIT" or tax numbers → "Tax Identification Number" field (NOT Form Number)
+   - Form references → "Form Number" field (NOT Tax ID)
+
+4. **Context-Aware Disambiguation**:
+   - If multiple numbers exist, distinguish between tax IDs, form numbers, and amounts
+   - Respect Spanish naming conventions when mapping to English name fields
+   - Use document structure clues to identify correct data types
+
+⚠️ CRITICAL MAPPING RULES:
+- Map "79524018 9" → Tax ID field (NOT Form Number)
+- Map "2118615051596" → Form Number field (NOT Tax ID)
+- Map "MORENO" → First Surname, "GUTIERREZ" → Second Surname
+- Map "HECTOR" → First Name, "ANTONIO" → Other Names
+- Only create mappings you're confident about - omit uncertain ones
+
+Return a JSON object with template field names as keys and correctly mapped extracted values.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: "Create the field mapping." }
+          { role: "user", content: "Create the intelligent field mapping." }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0.1 // Lower temperature for more consistent semantic mapping
       });
 
       const fieldMappings = JSON.parse(response.choices[0].message.content || '{}');
+      console.log(`🎯 Enhanced field mapping created ${Object.keys(fieldMappings).length} intelligent mappings:`, fieldMappings);
       return fieldMappings;
     } catch (error) {
       console.error('Field mapping enhancement failed:', error);
