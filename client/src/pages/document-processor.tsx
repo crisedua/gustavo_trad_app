@@ -283,16 +283,7 @@ export default function DocumentProcessor() {
                   Home
                 </Button>
               </Link>
-              <Link href="/admin/requests">
-                <Button variant="outline" size="sm" data-testid="button-admin-requests">
-                  Admin Requests
-                </Button>
-              </Link>
-              <Link href="/admin/templates">
-                <Button variant="outline" size="sm" data-testid="button-admin">
-                  Template Admin
-                </Button>
-              </Link>
+              {/* Admin links moved to password-protected home page */}
             </div>
           </div>
         </div>
