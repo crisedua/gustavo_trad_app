@@ -81,7 +81,10 @@ export class DatabaseStorage implements IStorage {
   async initializeDefaultTemplates(): Promise<void> {
     // Check if default template already exists
     const existingDefault = await db.select().from(templates).where(eq(templates.id, "default-marriage-cert")).limit(1);
-    if (existingDefault.length > 0) return;
+    if (existingDefault.length > 0) {
+      console.log('Default template already exists, skipping initialization');
+      return;
+    }
 
     // Add default marriage certificate template
     const defaultFieldMappings: TemplateFieldMappings = {
@@ -331,7 +334,7 @@ export class DatabaseStorage implements IStorage {
     const defaultTemplate: InsertTemplate = {
       name: "Marriage Certificate Template",
       description: "National Civil Registry format", 
-      filePath: "/public-objects/templates/marriage_certificate_template.pdf",
+      filePath: "/public-objects/templates/6f14972ca0ffbc137936e5f03eba3231.pdf",
       fieldMappings: defaultFieldMappings,
       isAutoCreated: false,
       sourceDocumentPath: null,
