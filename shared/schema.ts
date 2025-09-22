@@ -128,7 +128,7 @@ export const templates = pgTable("templates", {
 export const processingJobs = pgTable("processing_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   originalFilePath: text("original_file_path").notNull(),
-  status: text("status").notNull(), // 'uploading', 'ocr', 'extraction', 'mapping', 'generation', 'completed', 'error'
+  status: text("status").notNull(), // 'pending_review', 'uploading', 'ocr', 'extraction', 'mapping', 'generation', 'completed', 'error'
   extractedData: jsonb("extracted_data").$type<Record<string, string>>(),
   templateId: varchar("template_id").references(() => templates.id),
   // Renamed for clarity: this represents field names mapped to their extracted/filled values
