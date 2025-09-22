@@ -149,11 +149,9 @@ export class TemplateAnalysisService {
           fieldAnalyses = await this.analyzeFormFields(pdfFormFields, fullText);
           totalFieldsFound = pdfFormFields.length;
         } else {
-          console.log('⚠️ No PDF form fields found, falling back to visual marker detection');
-          const markers = await this.detectMarkersWithPositions(detailedResults);
-          console.log('✅ Marker detection completed, found:', markers.length, 'visual markers');
-          fieldAnalyses = await this.analyzeFields(markers, fullText);
-          totalFieldsFound = markers.length;
+          console.log('❌ No PDF form fields found. Template ignored - only PDFs with actual fillable form fields are supported.');
+          fieldAnalyses = [];
+          totalFieldsFound = 0;
         }
       } else {
         // Non-PDF files: use traditional marker detection
