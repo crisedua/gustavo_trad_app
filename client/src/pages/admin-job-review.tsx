@@ -229,7 +229,8 @@ export default function AdminJobReview() {
   };
 
   // Get file name from path
-  const getFileName = (filePath: string) => {
+  const getFileName = (filePath?: string) => {
+    if (!filePath) return 'No file name';
     return filePath.split('/').pop() || filePath;
   };
 
@@ -397,14 +398,14 @@ export default function AdminJobReview() {
               <div>
                 <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Created</Label>
                 <p className="text-sm text-gray-900 dark:text-gray-100" data-testid="text-created">
-                  {format(new Date(job.createdAt), 'PPp')}
+                  {job.createdAt ? format(new Date(job.createdAt), 'PPp') : 'No date'}
                 </p>
               </div>
 
               <div>
                 <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</Label>
                 <p className="text-sm text-gray-900 dark:text-gray-100" data-testid="text-updated">
-                  {format(new Date(job.updatedAt), 'PPp')}
+                  {job.updatedAt ? format(new Date(job.updatedAt), 'PPp') : 'No date'}
                 </p>
               </div>
 
