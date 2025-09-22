@@ -52,6 +52,11 @@ export default function TemplateAdmin() {
     description: ''
   });
 
+  // Force delete state
+  const [forceDeleteDialogOpen, setForceDeleteDialogOpen] = useState(false);
+  const [templateToForceDelete, setTemplateToForceDelete] = useState<Template | null>(null);
+  const [deleteError, setDeleteError] = useState<{jobsCount?: number; message?: string} | null>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -60,25 +65,41 @@ export default function TemplateAdmin() {
     queryKey: ['/api/templates'],
   });
 
-  // Delete template mutation
+  // Delete template mutation with force delete support
   const deleteTemplateMutation = useMutation({
-    mutationFn: async (templateId: string) => {
-      const res = await apiRequest('DELETE', `/api/templates/${templateId}`);
+    mutationFn: async ({ templateId, force = false }: { templateId: string; force?: boolean }) => {
+      const url = force ? `/api/templates/${templateId}?force=true` : `/api/templates/${templateId}`;
+      const res = await apiRequest('DELETE', url);
       return res.json();
     },
-    onSuccess: (data, templateId) => {
+    onSuccess: (data, { templateId, force }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
       toast({
         title: "Template Deleted",
-        description: "Template has been successfully deleted.",
+        description: force 
+          ? "Template and associated processing jobs have been successfully deleted."
+          : "Template has been successfully deleted.",
       });
     },
-    onError: (error: any) => {
-      toast({
-        title: "Delete Failed",
-        description: error.message || "Failed to delete template",
-        variant: "destructive",
-      });
+    onError: (error: any, { templateId, force }) => {
+      const errorData = error.response?.data || error;
+      
+      // Check if error is due to associated jobs
+      if (errorData.jobsCount && !force) {
+        // Find the template and show force delete dialog
+        const template = templates.find(t => t.id === templateId);
+        if (template) {
+          setTemplateToForceDelete(template);
+          setDeleteError(errorData);
+          setForceDeleteDialogOpen(true);
+        }
+      } else {
+        toast({
+          title: "Delete Failed",
+          description: errorData.message || error.message || "Failed to delete template",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -1105,7 +1126,7 @@ export default function TemplateAdmin() {
                                   Cancel
                                 </AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => deleteTemplateMutation.mutate(template.id)}
+                                  onClick={() => deleteTemplateMutation.mutate({ templateId: template.id, force: false })}
                                   disabled={deleteTemplateMutation.isPending}
                                   className="bg-red-600 hover:bg-red-700"
                                   data-testid={`button-confirm-delete-${template.id}`}
@@ -1127,6 +1148,52 @@ export default function TemplateAdmin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Force Delete Confirmation Dialog */}
+      <AlertDialog open={forceDeleteDialogOpen} onOpenChange={setForceDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-force-delete">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Template Has Associated Processing Jobs</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cannot delete template "{templateToForceDelete?.name}" because it has {deleteError?.jobsCount} associated processing jobs.
+              <br /><br />
+              <strong>Force Delete Options:</strong>
+              <br />• <strong>Force Delete:</strong> Delete the template and permanently remove all {deleteError?.jobsCount} associated processing jobs
+              <br />• <strong>Cancel:</strong> Keep the template and its processing jobs
+              <br /><br />
+              <strong className="text-red-600">Warning:</strong> Force delete will permanently remove all processing job data and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setForceDeleteDialogOpen(false);
+                setTemplateToForceDelete(null);
+                setDeleteError(null);
+              }}
+              data-testid="button-cancel-force-delete"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (templateToForceDelete) {
+                  deleteTemplateMutation.mutate({ templateId: templateToForceDelete.id, force: true });
+                  setForceDeleteDialogOpen(false);
+                  setTemplateToForceDelete(null);
+                  setDeleteError(null);
+                }
+              }}
+              disabled={deleteTemplateMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-force-delete"
+            >
+              {deleteTemplateMutation.isPending ? "Force Deleting..." : `Force Delete Template & ${deleteError?.jobsCount} Jobs`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
