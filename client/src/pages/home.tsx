@@ -1,9 +1,32 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Settings, Upload, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FileText, Settings, Upload, Zap, Lock, Shield, UserCheck } from "lucide-react";
+import { useState } from "react";
 
 export default function Home() {
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  
+  const ADMIN_PASSWORD = 'admin123'; // In production, this should be environment variable
+  
+  const handleAdminLogin = () => {
+    if (adminPassword === ADMIN_PASSWORD) {
+      setIsAdminAuthenticated(true);
+      setShowAdminLogin(false);
+      setAdminPassword('');
+    } else {
+      alert('Incorrect password');
+    }
+  };
+  
+  const handleAdminLogout = () => {
+    setIsAdminAuthenticated(false);
+    setAdminPassword('');
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="container mx-auto px-4 py-16">
@@ -86,6 +109,86 @@ export default function Home() {
             </Button>
           </Link>
           */}
+        </div>
+
+        {/* Admin Section */}
+        <div className="mt-12">
+          {!isAdminAuthenticated ? (
+            <div className="text-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAdminLogin(!showAdminLogin)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Admin Access
+              </Button>
+              
+              {showAdminLogin && (
+                <div className="mt-4 max-w-sm mx-auto">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="admin-password" className="text-sm font-medium">Admin Password</Label>
+                          <Input
+                            id="admin-password"
+                            type="password"
+                            value={adminPassword}
+                            onChange={(e) => setAdminPassword(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                            placeholder="Enter admin password"
+                            className="mt-2"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleAdminLogin} size="sm" className="flex-1">
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Login
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setShowAdminLogin(false)} 
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-green-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Panel</h3>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAdminLogout}>
+                  Logout
+                </Button>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/admin/requests">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto" data-testid="button-admin-requests">
+                    <Settings className="w-5 h-5 mr-2" />
+                    Admin Requests
+                  </Button>
+                </Link>
+                <Link href="/admin/templates">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto" data-testid="button-template-admin">
+                    <FileText className="w-5 h-5 mr-2" />
+                    Template Admin
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Process Overview */}
