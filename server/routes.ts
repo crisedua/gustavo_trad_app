@@ -681,6 +681,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Perform OCR on the original document
       console.log('Starting OCR processing for job:', job.id);
+      console.log('Job data received:', {
+        id: job.id,
+        originalFilePath: job.originalFilePath,
+        originalFilePathType: typeof job.originalFilePath,
+        jobKeys: Object.keys(job),
+        hasOriginalFilePath: 'originalFilePath' in job,
+        hasOriginal_file_path: 'original_file_path' in job
+      });
+      
       const ocrResult = await ocrService.extractTextFromFile(job.originalFilePath);
       
       // Update job with OCR results
