@@ -204,7 +204,18 @@ export class SupabaseStorage implements IStorage {
 
   // Initialize default templates
   async initializeDefaultTemplates(): Promise<void> {
-    // Check if default template already exists
+    // First, check if tables exist by trying a simple query
+    try {
+      const { error: testError } = await supabase.from('templates').select('id').limit(1);
+      if (testError && testError.message.includes('relation "public.templates" does not exist')) {
+        throw new Error('Database tables do not exist. Please create the tables in your Supabase dashboard first.');
+      }
+    } catch (error) {
+      console.error('Table existence check failed:', error);
+      throw error;
+    }
+
+    // Check if default template already exists  
     const existingDefault = await this.getTemplate("default-marriage-cert");
     if (existingDefault) return;
 
