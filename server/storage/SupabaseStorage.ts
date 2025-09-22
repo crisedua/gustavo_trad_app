@@ -85,7 +85,24 @@ export class SupabaseStorage implements IStorage {
       console.error('Error fetching template:', error);
       return undefined;
     }
-    return data;
+    
+    if (!data) return undefined;
+    
+    // Map snake_case database columns to camelCase TypeScript properties
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      filePath: data.file_path,
+      isAutoCreated: data.is_auto_created,
+      sourceDocumentPath: data.source_document_path,
+      templateType: data.template_type,
+      detectionMetadata: data.detection_metadata,
+      fieldMappings: data.field_mappings || data.fieldMappings, // Support both columns
+      validationRules: data.validation_rules,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async getTemplates(): Promise<Template[]> {
@@ -98,7 +115,24 @@ export class SupabaseStorage implements IStorage {
       console.error('Error fetching templates:', error);
       return [];
     }
-    return data || [];
+    
+    if (!data) return [];
+    
+    // Map snake_case database columns to camelCase TypeScript properties
+    return data.map(template => ({
+      id: template.id,
+      name: template.name,
+      description: template.description,
+      filePath: template.file_path,
+      isAutoCreated: template.is_auto_created,
+      sourceDocumentPath: template.source_document_path,
+      templateType: template.template_type,
+      detectionMetadata: template.detection_metadata,
+      fieldMappings: template.field_mappings || template.fieldMappings, // Support both columns
+      validationRules: template.validation_rules,
+      createdAt: template.created_at,
+      updatedAt: template.updated_at
+    }));
   }
 
   async updateTemplate(id: string, updates: Partial<Template>): Promise<Template | undefined> {
