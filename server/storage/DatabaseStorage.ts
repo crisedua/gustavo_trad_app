@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '../db.js';
 import { users, templates, processingJobs } from '@shared/schema';
 import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser, type TemplateFieldMappings } from "@shared/schema";
@@ -61,7 +61,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProcessingJobs(): Promise<ProcessingJob[]> {
-    return await db.select().from(processingJobs).orderBy(processingJobs.createdAt);
+    return await db.select().from(processingJobs).orderBy(desc(processingJobs.createdAt));
   }
 
   async updateProcessingJob(id: string, updates: Partial<ProcessingJob>): Promise<ProcessingJob | undefined> {
