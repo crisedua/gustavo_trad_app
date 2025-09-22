@@ -15,28 +15,28 @@ export interface ExtractedField {
 export class FieldExtractionService {
   
   /**
-   * Extract field names from template - use actual PDF form fields for manual templates
+   * Extract field names from template - use comprehensive PDF form field detection for ALL templates
    */
   async getFieldNamesFromTemplate(template: Template): Promise<string[]> {
-    // For manual templates, get the actual PDF form field names
-    if (!template.isAutoCreated) {
-      try {
-        const pdfFormFields = await this.getPDFFormFieldNames(template);
-        if (pdfFormFields.length > 0) {
-          console.log(`📋 Using PDF form field names for extraction: ${pdfFormFields.join(', ')}`);
-          return pdfFormFields;
-        }
-      } catch (error) {
-        console.warn('Failed to get PDF form fields, falling back to fieldMappings:', error);
+    // Try comprehensive PDF form field detection for ALL templates (manual and auto-created)
+    try {
+      const pdfFormFields = await this.getPDFFormFieldNames(template);
+      if (pdfFormFields.length > 0) {
+        console.log(`📋 Using comprehensive PDF form field names for extraction (${pdfFormFields.length} fields): ${pdfFormFields.slice(0, 10).join(', ')}${pdfFormFields.length > 10 ? '...' : ''}`);
+        return pdfFormFields;
       }
+    } catch (error) {
+      console.warn('Failed to get comprehensive PDF form fields, falling back to fieldMappings:', error);
     }
     
-    // Fallback to fieldMappings for auto-created templates or if PDF scan fails
+    // Fallback to fieldMappings if PDF scan fails
     if (!template.fieldMappings) {
       return [];
     }
     
-    return Object.keys(template.fieldMappings);
+    const fallbackFields = Object.keys(template.fieldMappings);
+    console.log(`📋 Using template fieldMappings as fallback (${fallbackFields.length} fields): ${fallbackFields.join(', ')}`);
+    return fallbackFields;
   }
   
   /**
