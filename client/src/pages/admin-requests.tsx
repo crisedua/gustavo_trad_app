@@ -176,7 +176,8 @@ export default function AdminRequests() {
   };
 
   // Get file name from path
-  const getFileName = (filePath: string) => {
+  const getFileName = (filePath?: string) => {
+    if (!filePath) return 'No file name';
     return filePath.split('/').pop() || filePath;
   };
 
@@ -387,7 +388,7 @@ export default function AdminRequests() {
                           <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                             <Calendar className="h-4 w-4" />
                             <span data-testid={`job-date-${job.id}`}>
-                              {format(new Date(job.createdAt), 'MMM dd, yyyy HH:mm')}
+                              {job.createdAt ? format(new Date(job.createdAt), 'MMM dd, yyyy HH:mm') : 'No date'}
                             </span>
                           </div>
                         </TableCell>
