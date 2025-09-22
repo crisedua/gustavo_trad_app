@@ -128,6 +128,7 @@ export const templates = pgTable("templates", {
 export const processingJobs = pgTable("processing_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   originalFilePath: text("original_file_path").notNull(),
+  userEmail: text("user_email").notNull(),
   status: text("status").notNull(), // 'pending_review', 'uploading', 'ocr', 'extraction', 'mapping', 'generation', 'completed', 'error'
   extractedData: jsonb("extracted_data").$type<Record<string, string>>(),
   templateId: varchar("template_id").references(() => templates.id),
@@ -312,6 +313,7 @@ export const updateTemplateSchema = createInsertSchema(templates).pick({
 
 export const insertProcessingJobSchema = createInsertSchema(processingJobs).pick({
   originalFilePath: true,
+  userEmail: true,
   status: true,
   extractedData: true,
   templateId: true,
@@ -320,6 +322,8 @@ export const insertProcessingJobSchema = createInsertSchema(processingJobs).pick
   // Add validation for extracted field values - require empty objects instead of null
   extractedData: z.record(z.string(), z.string()).default({}),
   extractedFieldValues: z.record(z.string(), z.string()).default({}),
+  // Add email validation
+  userEmail: z.string().email("Please enter a valid email address"),
 });
 
 // Updated schemas for automated template creation
