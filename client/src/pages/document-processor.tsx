@@ -176,14 +176,15 @@ export default function DocumentProcessor() {
       // Get current state values at upload time (avoid stale closures)
       // Use a small timeout to ensure DOM updates and state changes have been processed  
       setTimeout(() => {
-        // Get fresh state values to avoid closure issues - no auto-fallback to first template
-        const currentSelectedTemplateIdFresh = selectedTemplateId;
+        // Get current template selection from DOM to avoid stale closures
+        const templateSelect = document.getElementById('template-select') as HTMLSelectElement;
+        const currentSelectedTemplateIdFresh = templateSelect?.value || selectedTemplateId;
         
         // Get current email value from the DOM as backup to ensure we have the latest value
         const emailInput = document.getElementById('user-email') as HTMLInputElement;
         const currentUserEmail = emailInput?.value || userEmail;
         
-        console.log('Upload validation check - template:', currentSelectedTemplateIdFresh, 'email from state:', userEmail, 'email from DOM:', emailInput?.value, 'templates count:', templates.length);
+        console.log('Upload validation check - template from DOM:', templateSelect?.value, 'template from state:', selectedTemplateId, 'email from DOM:', emailInput?.value, 'templates count:', templates.length);
         
         if (!currentSelectedTemplateIdFresh || currentSelectedTemplateIdFresh === '') {
           toast({
