@@ -33,6 +33,7 @@ interface Template {
 interface ProcessingJob {
   id: string;
   originalFilePath: string;
+  userEmail: string;
   status: string;
   extractedData?: Record<string, string>;
   templateId?: string;
@@ -56,6 +57,7 @@ const statusSteps = [
 export default function DocumentProcessor() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; status: string }>>([]);
   const [showAllFields, setShowAllFields] = useState(false);
 
@@ -87,7 +89,7 @@ export default function DocumentProcessor() {
 
   // Create processing job mutation
   const createJobMutation = useMutation({
-    mutationFn: async (data: { originalFilePath: string; templateId?: string }) => {
+    mutationFn: async (data: { originalFilePath: string; userEmail: string; templateId?: string }) => {
       const res = await apiRequest('POST', '/api/processing-jobs', data);
       return res.json();
     },
@@ -171,11 +173,11 @@ export default function DocumentProcessor() {
         status: 'Uploaded'
       }]);
 
-      // CRITICAL FIX: Get the current template selection state instead of relying on stale closure
+      // CRITICAL FIX: Get the current template selection state and validate email
       // Use a timeout to ensure state updates have been processed
       setTimeout(() => {
         const currentSelectedTemplateId = templates.length > 0 && !selectedTemplateId ? templates[0].id : selectedTemplateId;
-        console.log('Upload validation check - currentSelectedTemplateId:', currentSelectedTemplateId, 'selectedTemplateId:', selectedTemplateId, 'templates count:', templates.length);
+        console.log('Upload validation check - currentSelectedTemplateId:', currentSelectedTemplateId, 'userEmail:', userEmail, 'templates count:', templates.length);
         
         if (!currentSelectedTemplateId || currentSelectedTemplateId === '') {
           toast({
@@ -187,16 +189,39 @@ export default function DocumentProcessor() {
           return;
         }
 
-        console.log('Creating processing job with templateId:', currentSelectedTemplateId);
+        if (!userEmail || userEmail.trim() === '') {
+          toast({
+            title: "Error",
+            description: "Please enter your email address before uploading a document.",
+            variant: "destructive",
+          });
+          console.error('Processing job creation aborted: No email provided');
+          return;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(userEmail.trim())) {
+          toast({
+            title: "Error",
+            description: "Please enter a valid email address.",
+            variant: "destructive",
+          });
+          console.error('Processing job creation aborted: Invalid email format');
+          return;
+        }
+
+        console.log('Creating processing job with templateId:', currentSelectedTemplateId, 'email:', userEmail);
         
         // Start processing
         createJobMutation.mutate({
           originalFilePath: uploadedFile.uploadURL || '',
+          userEmail: userEmail.trim(),
           templateId: currentSelectedTemplateId
         });
       }, 100); // Small delay to ensure state updates are processed
     }
-  }, [selectedTemplateId, templates, createJobMutation, toast]);
+  }, [selectedTemplateId, userEmail, templates, createJobMutation, toast]);
 
   // Handle extracted data changes
   const handleExtractedDataChange = (field: string, value: string) => {
@@ -388,12 +413,39 @@ export default function DocumentProcessor() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Contact Information */}
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-contact-info">
+            <CardContent className="p-8">
+              <div className="mb-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">2. Contact Information</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Please provide your email so we can notify you about your translation progress</p>
+              </div>
+              
+              <div>
+                <Label htmlFor="user-email" className="text-sm font-medium text-gray-900 dark:text-white">Email Address</Label>
+                <Input
+                  id="user-email"
+                  type="email"
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  placeholder="your.email@example.com"
+                  className="w-full mt-2"
+                  data-testid="input-user-email"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  We'll use this email to notify you when your document translation is ready
+                </p>
+              </div>
+            </CardContent>
+          </Card>
             
           {/* Document Upload */}
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-document-upload">
             <CardContent className="p-8">
               <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">2. Upload Document</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">3. Upload Document</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Upload the document to extract data for your selected template</p>
               </div>
               
@@ -444,7 +496,7 @@ export default function DocumentProcessor() {
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-processing-status">
             <CardContent className="p-8">
               <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">3. Processing Status</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">4. Processing Status</h2>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">AI-powered extraction and document processing</p>
               </div>
               
@@ -486,7 +538,7 @@ export default function DocumentProcessor() {
             <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-extracted-data">
               <CardContent className="p-8">
                 <div className="mb-6">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">4. Extracted Data</h2>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">5. Extracted Data</h2>
                   <p className="text-gray-600 dark:text-gray-400 text-sm">Review and edit the extracted fields</p>
                 </div>
                   
@@ -539,7 +591,7 @@ export default function DocumentProcessor() {
             <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-document-generation">
               <CardContent className="p-8">
                 <div className="mb-6">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">5. Generate Document</h2>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">6. Generate Document</h2>
                   <p className="text-gray-600 dark:text-gray-400 text-sm">Create the filled document using your template</p>
                 </div>
                 
