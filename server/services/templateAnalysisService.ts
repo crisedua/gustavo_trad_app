@@ -68,8 +68,9 @@ export class TemplateAnalysisService {
   private client: ImageAnnotatorClient;
   private storage: Storage;
 
-  // Common marker patterns for detection
+  // Enhanced marker patterns for detection including numbered fields
   private readonly MARKER_PATTERNS = [
+    // Visual marker patterns
     { pattern: /X{3,}/g, name: 'XXX_pattern', minLength: 3 },
     { pattern: /X{2}/g, name: 'XX_pattern', minLength: 2 },
     { pattern: /__{2,}/g, name: 'underscore_pattern', minLength: 2 },
@@ -79,9 +80,20 @@ export class TemplateAnalysisService {
     { pattern: /\{.*?\}/g, name: 'brace_pattern', minLength: 1 },
     { pattern: /\(\s*\)/g, name: 'empty_parentheses', minLength: 1 },
     { pattern: /\[\s*\]/g, name: 'empty_brackets', minLength: 1 },
-    // Custom patterns for form fields
     { pattern: /____+/g, name: 'long_underscore', minLength: 4 },
     { pattern: /\.\.\.+/g, name: 'ellipsis_pattern', minLength: 3 },
+    
+    // 📊 NUMBERED FIELD PATTERNS for DIAN forms and similar tax documents
+    { pattern: /\b(\d{1,3})\.\s*([A-Za-z][^:\n]{1,50}?)(?=\s|:|$)/g, name: 'numbered_field', minLength: 1 },
+    { pattern: /\b(Year|Form Number|Tax Identification|NIT|First Surname|Second Surname|First Name|Other Names|Regional Office|Economic Activity|Gross Assets|Liabilities|Net Worth|Income|Deductions|Balance|Penalties|Dependents)[\s\w]*(?=\s*:|\s*\d|\s*$)/gi, name: 'tax_form_field', minLength: 1 },
+    { pattern: /\b\d{1,3}\s*[\.\)\]:]/g, name: 'field_number', minLength: 1 },
+    { pattern: /(?:Field|Box|Line)\s*\d{1,3}/gi, name: 'field_reference', minLength: 1 },
+    { pattern: /\b(\d{29,141})\b/g, name: 'field_position_number', minLength: 1 }, // Fields 29-141 range
+    { pattern: /(Assets|Liabilities|Income|Deductions|Tax|Balance|Penalties)\s*\w*/gi, name: 'financial_field', minLength: 1 },
+    
+    // 📋 DIAN-specific patterns
+    { pattern: /\b(Renta|Activos|Pasivos|Patrimonio|Ingresos|Deducciones|Impuesto|Saldo|Sanciones)\b/gi, name: 'spanish_tax_field', minLength: 1 },
+    { pattern: /\b(Año|Número de formulario|Cédula|Primer apellido|Segundo apellido|Primer nombre|Otros nombres)\b/gi, name: 'spanish_personal_field', minLength: 1 }
   ];
 
   constructor() {
