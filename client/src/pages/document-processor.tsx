@@ -323,7 +323,7 @@ export default function DocumentProcessor() {
                     {templates.map((template) => (
                       <option key={template.id} value={template.id}>
                         {template.isAutoCreated ? '🤖 ' : '📄 '}{template.name}
-                        {template.isAutoCreated ? ' (AI-Detected)' : ' (Manual)'}
+                        {template.isAutoCreated ? ' (AI-Detected)' : ''}
                       </option>
                     ))}
                   </select>
@@ -334,13 +334,11 @@ export default function DocumentProcessor() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
-                        {selectedTemplate.isAutoCreated ? (
+                        {selectedTemplate.isAutoCreated && (
                           <div className="flex items-center space-x-1">
                             <Zap className="h-3 w-3 text-green-600" />
                             <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">AI-Detected</span>
                           </div>
-                        ) : (
-                          <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">Manual</span>
                         )}
                       </div>
                       {selectedTemplate.isAutoCreated && selectedTemplate.detectionMetadata?.confidence && (
