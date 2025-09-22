@@ -102,12 +102,27 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateTemplate(id: string, updates: Partial<Template>): Promise<Template | undefined> {
+    // Map camelCase properties to snake_case column names
+    const dbUpdates: any = {
+      updated_at: new Date().toISOString()
+    };
+    
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.filePath !== undefined) dbUpdates.file_path = updates.filePath;
+    if (updates.isAutoCreated !== undefined) dbUpdates.is_auto_created = updates.isAutoCreated;
+    if (updates.sourceDocumentPath !== undefined) dbUpdates.source_document_path = updates.sourceDocumentPath;
+    if (updates.templateType !== undefined) dbUpdates.template_type = updates.templateType;
+    if (updates.detectionMetadata !== undefined) dbUpdates.detection_metadata = updates.detectionMetadata;
+    if (updates.fieldMappings !== undefined) {
+      dbUpdates.field_mappings = updates.fieldMappings;
+      dbUpdates.fieldMappings = updates.fieldMappings; // Populate both columns
+    }
+    if (updates.validationRules !== undefined) dbUpdates.validation_rules = updates.validationRules;
+    
     const { data, error } = await supabase
       .from('templates')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
@@ -184,12 +199,21 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateProcessingJob(id: string, updates: Partial<ProcessingJob>): Promise<ProcessingJob | undefined> {
+    // Map camelCase properties to snake_case column names
+    const dbUpdates: any = {
+      updated_at: new Date().toISOString()
+    };
+    
+    if (updates.originalFilePath !== undefined) dbUpdates.original_file_path = updates.originalFilePath;
+    if (updates.userEmail !== undefined) dbUpdates.user_email = updates.userEmail;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.extractedData !== undefined) dbUpdates.extracted_data = updates.extractedData;
+    if (updates.templateId !== undefined) dbUpdates.template_id = updates.templateId;
+    if (updates.extractedFieldValues !== undefined) dbUpdates.extracted_field_values = updates.extractedFieldValues;
+    
     const { data, error } = await supabase
       .from('processing_jobs')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
