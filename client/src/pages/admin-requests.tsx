@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -77,8 +76,6 @@ const statusIcons = {
 };
 
 export default function AdminRequests() {
-  const [selectedJob, setSelectedJob] = useState<ProcessingJob | null>(null);
-  const [showJobDetails, setShowJobDetails] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -105,8 +102,6 @@ export default function AdminRequests() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/processing-jobs'] });
-      setShowJobDetails(false);
-      setSelectedJob(null);
     },
     onError: (error) => {
       toast({
@@ -125,8 +120,6 @@ export default function AdminRequests() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/processing-jobs'] });
-      setShowJobDetails(false);
-      setSelectedJob(null);
       toast({
         title: "Success",
         description: "Processing job has been deleted.",
@@ -393,108 +386,25 @@ export default function AdminRequests() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end space-x-2">
-                            <Dialog open={showJobDetails && selectedJob?.id === job.id} onOpenChange={(open) => {
-                              if (!open) {
-                                setShowJobDetails(false);
-                                setSelectedJob(null);
-                              }
-                            }}>
-                              <DialogTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedJob(job);
-                                    setShowJobDetails(true);
-                                  }}
-                                  data-testid={`button-view-${job.id}`}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
-                                <DialogHeader>
-                                  <DialogTitle>Processing Job Details</DialogTitle>
-                                  <DialogDescription>
-                                    Review and manage this processing request
-                                  </DialogDescription>
-                                </DialogHeader>
-                                
-                                {selectedJob && (
-                                  <div className="space-y-6">
-                                    {/* Job Info */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                        <h4 className="font-medium text-gray-900 dark:text-white mb-2">Document</h4>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400" data-testid="detail-filename">
-                                          {getFileName(selectedJob.originalFilePath)}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 className="font-medium text-gray-900 dark:text-white mb-2">Template</h4>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400" data-testid="detail-template">
-                                          {getTemplateName(selectedJob.templateId)}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 className="font-medium text-gray-900 dark:text-white mb-2">Upload Date</h4>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400" data-testid="detail-date">
-                                          {format(new Date(selectedJob.createdAt), 'MMMM dd, yyyy HH:mm:ss')}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <h4 className="font-medium text-gray-900 dark:text-white mb-2">Status</h4>
-                                        <StatusBadge status={selectedJob.status} />
-                                      </div>
-                                    </div>
-
-                                    {/* Error Message */}
-                                    {selectedJob.errorMessage && (
-                                      <Alert variant="destructive">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertDescription>
-                                          {selectedJob.errorMessage}
-                                        </AlertDescription>
-                                      </Alert>
-                                    )}
-
-                                    {/* Actions */}
-                                    <div className="flex justify-between pt-4 border-t">
-                                      <Button 
-                                        variant="destructive" 
-                                        onClick={() => handleDeleteJob(selectedJob)}
-                                        disabled={deleteJobMutation.isPending}
-                                        data-testid="button-delete-job"
-                                      >
-                                        <XCircle className="h-4 w-4 mr-2" />
-                                        {deleteJobMutation.isPending ? 'Deleting...' : 'Delete Job'}
-                                      </Button>
-                                      
-                                      <div className="flex space-x-2">
-                                        <Button 
-                                          variant="outline" 
-                                          onClick={() => handleRejectJob(selectedJob)}
-                                          disabled={updateJobMutation.isPending}
-                                          data-testid="button-reject-job"
-                                        >
-                                          <XCircle className="h-4 w-4 mr-2" />
-                                          {updateJobMutation.isPending ? 'Rejecting...' : 'Reject'}
-                                        </Button>
-                                        <Button 
-                                          onClick={() => handleApproveJob(selectedJob)}
-                                          disabled={updateJobMutation.isPending}
-                                          data-testid="button-approve-job"
-                                        >
-                                          <CheckCircle className="h-4 w-4 mr-2" />
-                                          {updateJobMutation.isPending ? 'Approving...' : 'Approve & Process'}
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </DialogContent>
-                            </Dialog>
+                            <Link href={`/admin/requests/${job.id}`}>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                data-testid={`button-view-${job.id}`}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </Link>
+                            <Link href={`/admin/requests/${job.id}`}>
+                              <Button 
+                                size="sm"
+                                data-testid={`button-approve-${job.id}`}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Review
+                              </Button>
+                            </Link>
                           </div>
                         </TableCell>
                       </TableRow>

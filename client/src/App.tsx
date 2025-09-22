@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import DocumentProcessor from "@/pages/document-processor";
 import TemplateAdmin from "@/pages/template-admin";
 import AdminRequests from "@/pages/admin-requests";
+import AdminJobReview from "@/pages/admin-job-review";
 
 function Router() {
   return (
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/process" component={DocumentProcessor} />
       <Route path="/admin/templates" component={TemplateAdmin} />
       <Route path="/admin/requests" component={AdminRequests} />
+      <Route path="/admin/requests/:id" component={AdminJobReview} />
       <Route component={NotFound} />
     </Switch>
   );
