@@ -554,14 +554,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/processing-jobs", async (req, res) => {
     try {
-      const { originalFilePath, templateId } = req.body;
+      const { originalFilePath, userEmail, templateId } = req.body;
 
       if (!originalFilePath) {
         return res.status(400).json({ error: "originalFilePath is required" });
       }
 
+      if (!userEmail) {
+        return res.status(400).json({ error: "userEmail is required" });
+      }
+
       const jobData = insertProcessingJobSchema.parse({
         originalFilePath,
+        userEmail,
         templateId: templateId || null,
         status: 'pending_review',
         extractedData: {},
