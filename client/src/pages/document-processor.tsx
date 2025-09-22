@@ -171,27 +171,32 @@ export default function DocumentProcessor() {
         status: 'Uploaded'
       }]);
 
-      // CRITICAL FIX: Validate templateId before creating processing job
-      console.log('Upload validation check - selectedTemplateId:', selectedTemplateId, 'templates count:', templates.length);
-      if (!selectedTemplateId || selectedTemplateId === '') {
-        toast({
-          title: "Error",
-          description: "Please select a template before uploading a document.",
-          variant: "destructive",
-        });
-        console.error('Processing job creation aborted: No template selected. Current selectedTemplateId:', selectedTemplateId);
-        return;
-      }
+      // CRITICAL FIX: Get the current template selection state instead of relying on stale closure
+      // Use a timeout to ensure state updates have been processed
+      setTimeout(() => {
+        const currentSelectedTemplateId = templates.length > 0 && !selectedTemplateId ? templates[0].id : selectedTemplateId;
+        console.log('Upload validation check - currentSelectedTemplateId:', currentSelectedTemplateId, 'selectedTemplateId:', selectedTemplateId, 'templates count:', templates.length);
+        
+        if (!currentSelectedTemplateId || currentSelectedTemplateId === '') {
+          toast({
+            title: "Error",
+            description: "Please select a template before uploading a document.",
+            variant: "destructive",
+          });
+          console.error('Processing job creation aborted: No template selected. Current selectedTemplateId:', currentSelectedTemplateId);
+          return;
+        }
 
-      console.log('Creating processing job with templateId:', selectedTemplateId);
-      
-      // Start processing
-      createJobMutation.mutate({
-        originalFilePath: uploadedFile.uploadURL || '',
-        templateId: selectedTemplateId
-      });
+        console.log('Creating processing job with templateId:', currentSelectedTemplateId);
+        
+        // Start processing
+        createJobMutation.mutate({
+          originalFilePath: uploadedFile.uploadURL || '',
+          templateId: currentSelectedTemplateId
+        });
+      }, 100); // Small delay to ensure state updates are processed
     }
-  }, [selectedTemplateId, createJobMutation, toast]);
+  }, [selectedTemplateId, templates, createJobMutation, toast]);
 
   // Handle extracted data changes
   const handleExtractedDataChange = (field: string, value: string) => {
