@@ -76,9 +76,9 @@ export function ObjectUploader({
 
   return (
     <div>
-      <Button onClick={() => setShowModal(true)} className={buttonClassName}>
+      <div onClick={() => setShowModal(true)} className={buttonClassName}>
         {children}
-      </Button>
+      </div>
 
       <DashboardModal
         uppy={uppy}
