@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIAN - Formulario de Declaración de Renta</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        
+        .form-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .form-section {
+            margin-bottom: 25px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .section-title {
+            background: #2c5282;
+            color: white;
+            padding: 8px 12px;
+            margin: -15px -15px 15px -15px;
+            font-weight: bold;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 120px;
+        }
+        
+        .field-group.wide {
+            min-width: 250px;
+        }
+        
+        label {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 3px;
+            color: #333;
+        }
+        
+        input[type="text"], input[type="number"], input[type="date"], select {
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 11px;
+            background: #fff;
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, select:focus {
+            border-color: #2c5282;
+            outline: none;
+            box-shadow: 0 0 5px rgba(44, 82, 130, 0.3);
+        }
+        
+        .barcode-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            background: #f9f9f9;
+            color: #666;
+        }
+        
+        .income-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .income-table th, .income-table td {
+            border: 1px solid #ddd;
+            padding: 6px 8px;
+            font-size: 10px;
+            text-align: left;
+        }
+        
+        .income-table th {
+            background: #e2e8f0;
+            font-weight: bold;
+        }
+        
+        .income-table input {
+            width: 100%;
+            border: none;
+            padding: 2px;
+            font-size: 10px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .signature-section {
+            border-top: 2px solid #333;
+            padding-top: 20px;
+            margin-top: 30px;
+        }
+        
+        .signature-box {
+            border: 1px solid #ccc;
+            height: 60px;
+            margin-top: 5px;
+            background: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .print-button {
+            background: #2c5282;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 20px 0;
+        }
+        
+        .print-button:hover {
+            background: #2a4f7a;
+        }
+        
+        @media print {
+            body { margin: 0; background: white; }
+            .print-button { display: none; }
+            .form-container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="header">
+            <h1>DIAN</h1>
+            <p><strong>Income Tax Return and Complementary Return for Resident Individuals and Equivalent Taxpayers, and Estates of Resident Decedents</strong></p>
+            <p><strong>PRIVATE 210</strong></p>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Basic Information</div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="year">1. Year:</label>
+                    <input type="text" id="year" name="year" placeholder="YYYY">
+                </div>
+                <div class="field-group wide">
+                    <label for="form-number">4. Form Number:</label>
+                    <input type="text" id="form-number" name="form-number" value="2118615051596" readonly>
+                </div>
+            </div>
+
+            <div class="barcode-area">
+                Space reserved for use by DIAN - Barcode Area
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Declarant Information</div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="nit">5. Tax Identification Number (NIT):</label>
+                    <input type="text" id="nit" name="nit" placeholder="Enter NIT">
+                </div>
+                <div class="field-group">
+                    <label for="vd">6. VD:</label>
+                    <input type="text" id="vd" name="vd" placeholder="X">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="first-surname">7. First Surname:</label>
+                    <input type="text" id="first-surname" name="first-surname" placeholder="First Surname">
+                </div>
+                <div class="field-group wide">
+                    <label for="second-surname">8. Second Surname:</label>
+                    <input type="text" id="second-surname" name="second-surname" placeholder="Second Surname">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="first-name">9. First Name:</label>
+                    <input type="text" id="first-name" name="first-name" placeholder="First Name">
+                </div>
+                <div class="field-group wide">
+                    <label for="other-names">10. Other Names:</label>
+                    <input type="text" id="other-names" name="other-names" placeholder="Other Names">
+                </div>
+                <div class="field-group">
+                    <label for="regional-office">12. Regional Office Code:</label>
+                    <input type="text" id="regional-office" name="regional-office" placeholder="XX">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Economic Activity & Return Information</div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="economic-activity">24. Main Economic Activity:</label>
+                    <input type="text" id="economic-activity" name="economic-activity" placeholder="Enter activity">
+                </div>
+                <div class="field-group">
+                    <label for="correction-code">25. Code (if correction):</label>
+                    <input type="text" id="correction-code" name="correction-code" placeholder="XX">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="prior-year-return">26. Prior Year Return No.:</label>
+                    <input type="text" id="prior-year-return" name="prior-year-return" placeholder="Return #">
+                </div>
+                <div class="field-group">
+                    <label for="partial-year">27. Partial-Year Return:</label>
+                    <input type="checkbox" id="partial-year" name="partial-year">
+                </div>
+                <div class="field-group wide">
+                    <label for="purchases-einvoice">28. 1% of purchases with einvoice:</label>
+                    <input type="number" id="purchases-einvoice" name="purchases-einvoice" placeholder="Amount">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Assets and Liabilities</div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="total-assets">29. Total Gross Assets:</label>
+                    <input type="number" id="total-assets" name="total-assets" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="liabilities">30. Liabilities/Debts:</label>
+                    <input type="number" id="liabilities" name="liabilities" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="net-worth">31. Net Worth:</label>
+                    <input type="number" id="net-worth" name="net-worth" placeholder="Amount">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Income Section</div>
+            
+            <table class="income-table">
+                <thead>
+                    <tr>
+                        <th>Sources/Income</th>
+                        <th>Column 1</th>
+                        <th>Column 2</th>
+                        <th>Column 3</th>
+                        <th>Column 4</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>32-43-58-74. Gross Income</td>
+                        <td><input type="number" name="gross-income-1" placeholder="32"></td>
+                        <td><input type="number" name="gross-income-2" placeholder="43"></td>
+                        <td><input type="number" name="gross-income-3" placeholder="58"></td>
+                        <td><input type="number" name="gross-income-4" placeholder="74"></td>
+                    </tr>
+                    <tr>
+                        <td>75. Refunds, Rebates and Discounts</td>
+                        <td colspan="3"></td>
+                        <td><input type="number" name="refunds" placeholder="75"></td>
+                    </tr>
+                    <tr>
+                        <td>33-44-59-76. Non-Taxable Income</td>
+                        <td><input type="number" name="non-taxable-1" placeholder="33"></td>
+                        <td><input type="number" name="non-taxable-2" placeholder="44"></td>
+                        <td><input type="number" name="non-taxable-3" placeholder="59"></td>
+                        <td><input type="number" name="non-taxable-4" placeholder="76"></td>
+                    </tr>
+                    <tr>
+                        <td>45-60-77. Allowable Costs and Deductions</td>
+                        <td></td>
+                        <td><input type="number" name="costs-1" placeholder="45"></td>
+                        <td><input type="number" name="costs-2" placeholder="60"></td>
+                        <td><input type="number" name="costs-3" placeholder="77"></td>
+                    </tr>
+                    <tr>
+                        <td>34-46-61-78. Taxable Income</td>
+                        <td><input type="number" name="taxable-1" placeholder="34"></td>
+                        <td><input type="number" name="taxable-2" placeholder="46"></td>
+                        <td><input type="number" name="taxable-3" placeholder="61"></td>
+                        <td><input type="number" name="taxable-4" placeholder="78"></td>
+                    </tr>
+                    <tr>
+                        <td>62-79. Passive Income (Controlled Foreign Entities)</td>
+                        <td></td>
+                        <td></td>
+                        <td><input type="number" name="passive-1" placeholder="62"></td>
+                        <td><input type="number" name="passive-2" placeholder="79"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Exempt Income</div>
+            
+            <table class="income-table">
+                <tbody>
+                    <tr>
+                        <td>35-47-63-80. Voluntary Contributions AFC, FVP, AVC</td>
+                        <td><input type="number" name="voluntary-1" placeholder="35"></td>
+                        <td><input type="number" name="voluntary-2" placeholder="47"></td>
+                        <td><input type="number" name="voluntary-3" placeholder="63"></td>
+                        <td><input type="number" name="voluntary-4" placeholder="80"></td>
+                    </tr>
+                    <tr>
+                        <td>36-48-64-81. Other Exempt Income</td>
+                        <td><input type="number" name="other-exempt-1" placeholder="36"></td>
+                        <td><input type="number" name="other-exempt-2" placeholder="48"></td>
+                        <td><input type="number" name="other-exempt-3" placeholder="64"></td>
+                        <td><input type="number" name="other-exempt-4" placeholder="81"></td>
+                    </tr>
+                    <tr>
+                        <td>37-49-65-82. Total Exempt Income</td>
+                        <td><input type="number" name="total-exempt-1" placeholder="37"></td>
+                        <td><input type="number" name="total-exempt-2" placeholder="49"></td>
+                        <td><input type="number" name="total-exempt-3" placeholder="65"></td>
+                        <td><input type="number" name="total-exempt-4" placeholder="82"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Deductions and Expenses</div>
+            
+            <table class="income-table">
+                <tbody>
+                    <tr>
+                        <td>38-50-66-83. Mortgage Interest Deduction</td>
+                        <td><input type="number" name="mortgage-1" placeholder="38"></td>
+                        <td><input type="number" name="mortgage-2" placeholder="50"></td>
+                        <td><input type="number" name="mortgage-3" placeholder="66"></td>
+                        <td><input type="number" name="mortgage-4" placeholder="83"></td>
+                    </tr>
+                    <tr>
+                        <td>39-51-67-84. Other Allowable Deductions</td>
+                        <td><input type="number" name="other-deductions-1" placeholder="39"></td>
+                        <td><input type="number" name="other-deductions-2" placeholder="51"></td>
+                        <td><input type="number" name="other-deductions-3" placeholder="67"></td>
+                        <td><input type="number" name="other-deductions-4" placeholder="84"></td>
+                    </tr>
+                    <tr>
+                        <td>40-52-68-85. Total Deductions</td>
+                        <td><input type="number" name="total-deductions-1" placeholder="40"></td>
+                        <td><input type="number" name="total-deductions-2" placeholder="52"></td>
+                        <td><input type="number" name="total-deductions-3" placeholder="68"></td>
+                        <td><input type="number" name="total-deductions-4" placeholder="85"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Net Income Calculations</div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="line-91">91. Net Taxable Income:</label>
+                    <input type="number" id="line-91" name="line-91" placeholder="Amount">
+                </div>
+                <div class="field-group">
+                    <label for="line-92">92. Ex. Income and Ded. Net Tax:</label>
+                    <input type="number" id="line-92" name="line-92" placeholder="Amount">
+                </div>
+                <div class="field-group">
+                    <label for="line-93">93. Ordinary Net Taxable Income:</label>
+                    <input type="number" id="line-93" name="line-93" placeholder="Amount">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="line-94">94. Net Op. Loss Carryforwards 2018 & Prior:</label>
+                    <input type="number" id="line-94" name="line-94" placeholder="Amount">
+                </div>
+                <div class="field-group">
+                    <label for="line-95">95. Excess Presumptive Inc. Carryforward:</label>
+                    <input type="number" id="line-95" name="line-95" placeholder="Amount">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Pensions Income</div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="line-99">99. Gross Income from Pensions (Domestic and Foreign):</label>
+                    <input type="number" id="line-99" name="line-99" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="line-100">100. Nontaxable Income:</label>
+                    <input type="number" id="line-100" name="line-100" placeholder="Amount">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="line-101">101. Taxable Income:</label>
+                    <input type="number" id="line-101" name="line-101" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="line-102">102. Exempt Pension Income:</label>
+                    <input type="number" id="line-102" name="line-102" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="line-103">103. Taxable Pension Income:</label>
+                    <input type="number" id="line-103" name="line-103" placeholder="Amount">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Tax Computation</div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="line-116">116. Income Tax on Taxable Income:</label>
+                    <input type="number" id="line-116" name="line-116" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="line-122">122. Foreign Tax Paid:</label>
+                    <input type="number" id="line-122" name="line-122" placeholder="Amount">
+                    <input type="checkbox" name="foreign-tax-check" style="margin-left: 5px;">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="line-123">123. Charitable Contributions:</label>
+                    <input type="number" id="line-123" name="line-123" placeholder="Amount">
+                </div>
+                <div class="field-group wide">
+                    <label for="line-124">124. Div., Distr., & Other Inc:</label>
+                    <input type="number" id="line-124" name="line-124" placeholder="Amount">
+                    <input type="checkbox" name="div-check" style="margin-left: 5px;">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="line-134">134. Balance of Tax Due:</label>
+                    <input type="number" id="line-134" name="line-134" placeholder="Amount">
+                    <input type="checkbox" name="balance-check" style="margin-left: 5px;">
+                </div>
+                <div class="field-group">
+                    <label for="line-135">135. Penalties:</label>
+                    <input type="number" id="line-135" name="line-135" placeholder="Amount">
+                    <input type="checkbox" name="penalties-check" style="margin-left: 5px;">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="line-136">136. Total Balance Due:</label>
+                    <input type="number" id="line-136" name="line-136" placeholder="Amount">
+                    <input type="checkbox" name="total-balance-check" style="margin-left: 5px;">
+                </div>
+                <div class="field-group">
+                    <label for="line-137">137. Total Overpayment:</label>
+                    <input type="number" id="line-137" name="line-137" placeholder="Amount">
+                    <input type="checkbox" name="overpayment-check" style="margin-left: 5px;">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Additional Information</div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="line-138">138. Number of Dependents:</label>
+                    <input type="number" id="line-138" name="line-138" placeholder="Number">
+                    <input type="checkbox" name="dependents-check" style="margin-left: 5px;">
+                </div>
+                <div class="field-group">
+                    <label for="line-139">139. Addition for Dependents:</label>
+                    <input type="number" id="line-139" name="line-139" placeholder="Amount">
+                    <input type="checkbox" name="addition-check" style="margin-left: 5px;">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="line-140">140. Exceeded indicative threshold:</label>
+                    <input type="checkbox" id="line-140" name="line-140">
+                    <input type="checkbox" name="threshold-check" style="margin-left: 5px;">
+                </div>
+                <div class="field-group">
+                    <label for="line-141">141. Voluntary Contribution:</label>
+                    <input type="number" id="line-141" name="line-141" placeholder="Amount">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section signature-section">
+            <div class="section-title">Signatures and Professional Information</div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="representation-code">981. Representation Code:</label>
+                    <input type="text" id="representation-code" name="representation-code" placeholder="Code">
+                </div>
+                <div class="field-group">
+                    <label for="total-payment">980. Total Payment $:</label>
+                    <input type="number" id="total-payment" name="total-payment" placeholder="Amount">
+                    <input type="checkbox" name="payment-check" style="margin-left: 5px;">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label>Signature of Taxpayer or Authorized Representative:</label>
+                    <div class="signature-box">Digital Signature Area</div>
+                </div>
+                <div class="field-group wide">
+                    <label for="dian-use">997. For Exclusive Use by the Tax Authority:</label>
+                    <input type="text" id="dian-use" name="dian-use" placeholder="DIAN Use Only">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="accountant-code">982. Accountant Code:</label>
+                    <input type="text" id="accountant-code" name="accountant-code" placeholder="Code">
+                </div>
+                <div class="field-group">
+                    <label for="exceptions">994. With exceptions:</label>
+                    <input type="text" id="exceptions" name="exceptions" placeholder="Details">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label>Accountant Signature:</label>
+                    <div class="signature-box">Digital Signature Area</div>
+                </div>
+                <div class="field-group wide">
+                    <label for="timestamp">Timestamp:</label>
+                    <input type="datetime-local" id="timestamp" name="timestamp">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="professional-license">983. Professional License Number:</label>
+                    <input type="text" id="professional-license" name="professional-license" placeholder="License #">
+                </div>
+                <div class="field-group wide">
+                    <label for="dian-internal">996. Space for DIAN's Internal Number:</label>
+                    <input type="text" id="dian-internal" name="dian-internal" placeholder="Internal Use">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-group wide">
+                    <label for="receipt-date">Acknowledgment of Receipt Date:</label>
+                    <input type="date" id="receipt-date" name="receipt-date">
+                </div>
+                <div class="field-group">
+                    <label for="signed">Signed:</label>
+                    <input type="text" id="signed" name="signed" placeholder="Signature">
+                </div>
+            </div>
+        </div>
+
+        <button class="print-button" onclick="window.print()">Print Form</button>
+    </div>
+
+    <script>
+        // Auto-calculate net worth
+        document.addEventListener('DOMContentLoaded', function() {
+            const assetsField = document.getElementById('total-assets');
+            const liabilitiesField = document.getElementById('liabilities');
+            const netWorthField = document.getElementById('net-worth');
+            
+            function calculateNetWorth() {
+                const assets = parseFloat(assetsField.value) || 0;
+                const liabilities = parseFloat(liabilitiesField.value) || 0;
+                netWorthField.value = assets - liabilities;
+            }
+            
+            assetsField.addEventListener('input', calculateNetWorth);
+            liabilitiesField.addEventListener('input', calculateNetWorth);
+        });
+
+        // Format numbers with commas
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('blur', function() {
+                if (this.value) {
+                    const num = parseFloat(this.value);
+                    if (!isNaN(num)) {
+                        this.value = num.toLocaleString();
+                    }
+                }
+            });
+            
+            input.addEventListener('focus', function() {
+                this.value = this.value.replace(/,/g, '');
+            });
+        });
+    </script>
+</body>
+</html>
