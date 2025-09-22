@@ -2,8 +2,15 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Template, TemplateFieldMappings } from '@shared/schema';
+import { HTMLTemplateService } from './htmlTemplateService';
 
 export class DocumentGenerationService {
+  private htmlTemplateService: HTMLTemplateService;
+  
+  constructor() {
+    this.htmlTemplateService = new HTMLTemplateService();
+  }
+
   // New method that handles both manual and auto-created templates
   async fillPDFTemplateWithTemplate(template: Template, extractedFieldValues: Record<string, string>): Promise<Buffer> {
     try {
@@ -76,6 +83,12 @@ export class DocumentGenerationService {
       if (template.isAutoCreated && template.fieldMappings) {
         console.log('Using coordinate-based field placement for auto-created template...');
         return await this.fillPDFWithCoordinates(pdfDoc, template.fieldMappings, extractedFieldValues);
+      }
+      
+      // Check if this is a DIAN tax form - use HTML template approach
+      if (template.name.toLowerCase().includes('dian') || template.name.toLowerCase().includes('tax')) {
+        console.log('Using HTML template approach for DIAN tax form...');
+        return await this.htmlTemplateService.generateDIANDocument(extractedFieldValues);
       }
       
       // Fallback to creating DIAN tax form from scratch
