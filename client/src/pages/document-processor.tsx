@@ -173,23 +173,29 @@ export default function DocumentProcessor() {
         status: 'Uploaded'
       }]);
 
-      // CRITICAL FIX: Get the current template selection state and validate email
-      // Use a timeout to ensure state updates have been processed
+      // Get current state values at upload time (avoid stale closures)
+      // Use a small timeout to ensure DOM updates and state changes have been processed  
       setTimeout(() => {
-        const currentSelectedTemplateId = templates.length > 0 && !selectedTemplateId ? templates[0].id : selectedTemplateId;
-        console.log('Upload validation check - currentSelectedTemplateId:', currentSelectedTemplateId, 'userEmail:', userEmail, 'templates count:', templates.length);
+        // Get fresh state values to avoid closure issues
+        const currentSelectedTemplateIdFresh = templates.length > 0 && !selectedTemplateId ? templates[0].id : selectedTemplateId;
         
-        if (!currentSelectedTemplateId || currentSelectedTemplateId === '') {
+        // Get current email value from the DOM as backup to ensure we have the latest value
+        const emailInput = document.getElementById('user-email') as HTMLInputElement;
+        const currentUserEmail = emailInput?.value || userEmail;
+        
+        console.log('Upload validation check - template:', currentSelectedTemplateIdFresh, 'email from state:', userEmail, 'email from DOM:', emailInput?.value, 'templates count:', templates.length);
+        
+        if (!currentSelectedTemplateIdFresh || currentSelectedTemplateIdFresh === '') {
           toast({
             title: "Error",
             description: "Please select a template before uploading a document.",
             variant: "destructive",
           });
-          console.error('Processing job creation aborted: No template selected. Current selectedTemplateId:', currentSelectedTemplateId);
+          console.error('Processing job creation aborted: No template selected');
           return;
         }
 
-        if (!userEmail || userEmail.trim() === '') {
+        if (!currentUserEmail || currentUserEmail.trim() === '') {
           toast({
             title: "Error",
             description: "Please enter your email address before uploading a document.",
@@ -201,7 +207,7 @@ export default function DocumentProcessor() {
 
         // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(userEmail.trim())) {
+        if (!emailRegex.test(currentUserEmail.trim())) {
           toast({
             title: "Error",
             description: "Please enter a valid email address.",
@@ -211,15 +217,15 @@ export default function DocumentProcessor() {
           return;
         }
 
-        console.log('Creating processing job with templateId:', currentSelectedTemplateId, 'email:', userEmail);
+        console.log('Creating processing job with templateId:', currentSelectedTemplateIdFresh, 'email:', currentUserEmail);
         
         // Start processing
         createJobMutation.mutate({
           originalFilePath: uploadedFile.uploadURL || '',
-          userEmail: userEmail.trim(),
-          templateId: currentSelectedTemplateId
+          userEmail: currentUserEmail.trim(),
+          templateId: currentSelectedTemplateIdFresh
         });
-      }, 100); // Small delay to ensure state updates are processed
+      }, 100);
     }
   }, [selectedTemplateId, userEmail, templates, createJobMutation, toast]);
 
