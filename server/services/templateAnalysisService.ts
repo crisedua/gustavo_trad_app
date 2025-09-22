@@ -136,11 +136,16 @@ export class TemplateAnalysisService {
       const { fullText, detailedResults } = await this.extractDetailedOCRData(filePath);
       console.log('✅ OCR extraction completed, text length:', fullText.length);
       
-      // Step 2: Enhanced field detection - try PDF form fields first for PDFs
+      // Step 2: Enhanced field detection - detect file type by content, not extension
       let fieldAnalyses: FieldAnalysis[] = [];
       let totalFieldsFound = 0;
       
-      if (filePath.toLowerCase().endsWith('.pdf')) {
+      // Detect actual file type by reading content
+      const fileBuffer = fs.readFileSync(filePath);
+      const actualFileType = this.detectFileType(fileBuffer, filePath);
+      console.log('🔍 Detected file type:', actualFileType);
+      
+      if (actualFileType === 'pdf') {
         console.log('📋 Attempting PDF form field detection...');
         const pdfFormFields = await this.detectPDFFormFields(filePath);
         
