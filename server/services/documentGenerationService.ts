@@ -11,6 +11,94 @@ export class DocumentGenerationService {
     this.htmlTemplateService = new HTMLTemplateService();
   }
 
+  // Intelligent field mapping - maps extracted data to discovered PDF form fields
+  private createIntelligentFieldMappings(formFieldNames: string[], extractedFieldValues: Record<string, string>): Record<string, string> {
+    const mappings: Record<string, string> = {};
+    
+    console.log(`🎯 Mapping ${Object.keys(extractedFieldValues).length} extracted values to ${formFieldNames.length} form fields`);
+    console.log('Form fields found:', formFieldNames);
+    
+    // Create comprehensive mapping patterns
+    const mappingPatterns = [
+      // Direct exact matches
+      { pattern: /^YEAR$/i, value: extractedFieldValues.year || '2023' },
+      { pattern: /^FIRSTSURNAME$/i, value: extractedFieldValues.first_surname || '' },
+      { pattern: /^SECONDSURNAME$/i, value: extractedFieldValues.second_surname || '' },
+      { pattern: /^FIRST\s*NAME$/i, value: extractedFieldValues.first_name || '' },
+      { pattern: /^FIRST$/i, value: extractedFieldValues.first_name || '' },
+      { pattern: /^OTHER\s*NAMES?$/i, value: extractedFieldValues.other_names || '' },
+      
+      // Tax identification patterns
+      { pattern: /^(NIT|TAX_?ID|IDENTIFICATION)$/i, value: extractedFieldValues.tax_id || extractedFieldValues.number || '' },
+      { pattern: /^Text\s*Field\s*\d*$/i, value: extractedFieldValues.tax_id || extractedFieldValues.number || '' },
+      { pattern: /^FORM.*NUMBER$/i, value: extractedFieldValues.tax_id || extractedFieldValues.number || '' },
+      
+      // Year patterns
+      { pattern: /^(Year|año|ANNO)$/i, value: extractedFieldValues.year || '2023' },
+      
+      // Name patterns with variations
+      { pattern: /^(PRIMER.*APELLIDO|FIRST.*SURNAME)$/i, value: extractedFieldValues.first_surname || '' },
+      { pattern: /^(SEGUNDO.*APELLIDO|SECOND.*SURNAME)$/i, value: extractedFieldValues.second_surname || '' },
+      { pattern: /^(PRIMER.*NOMBRE|FIRST.*NAME)$/i, value: extractedFieldValues.first_name || '' },
+      { pattern: /^(OTROS.*NOMBRES|OTHER.*NAMES)$/i, value: extractedFieldValues.other_names || '' },
+      
+      // Common numbered field patterns for tax forms
+      { pattern: /^2[0-9]$/i, value: extractedFieldValues.year || '2023' }, // Fields like 20, 21, 22, etc.
+      { pattern: /^3[0-9]$/i, value: extractedFieldValues.tax_id || extractedFieldValues.number || '' },
+      { pattern: /^4[0-9]$/i, value: extractedFieldValues.first_surname || '' },
+      { pattern: /^5[0-9]$/i, value: extractedFieldValues.second_surname || '' },
+      { pattern: /^6[0-9]$/i, value: extractedFieldValues.first_name || '' },
+      { pattern: /^7[0-9]$/i, value: extractedFieldValues.other_names || '' },
+      
+      // Generic numbered fields
+      { pattern: /^(field|campo)_?1$/i, value: extractedFieldValues.year || '2023' },
+      { pattern: /^(field|campo)_?2$/i, value: extractedFieldValues.tax_id || extractedFieldValues.number || '' },
+      { pattern: /^(field|campo)_?3$/i, value: extractedFieldValues.first_surname || '' },
+      { pattern: /^(field|campo)_?4$/i, value: extractedFieldValues.second_surname || '' },
+      { pattern: /^(field|campo)_?5$/i, value: extractedFieldValues.first_name || '' },
+      { pattern: /^(field|campo)_?6$/i, value: extractedFieldValues.other_names || '' },
+    ];
+    
+    // Apply pattern matching
+    for (const fieldName of formFieldNames) {
+      let mapped = false;
+      
+      // Try each pattern
+      for (const { pattern, value } of mappingPatterns) {
+        if (pattern.test(fieldName) && value) {
+          mappings[fieldName] = value;
+          console.log(`✅ Mapped field "${fieldName}" -> "${value}" (pattern: ${pattern})`);
+          mapped = true;
+          break;
+        }
+      }
+      
+      // If no pattern matched, try direct key matching
+      if (!mapped) {
+        const normalizedFieldName = fieldName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        for (const [key, value] of Object.entries(extractedFieldValues)) {
+          if (value && (
+            key.toLowerCase() === normalizedFieldName ||
+            key.toLowerCase().includes(normalizedFieldName) ||
+            normalizedFieldName.includes(key.toLowerCase())
+          )) {
+            mappings[fieldName] = value;
+            console.log(`✅ Mapped field "${fieldName}" -> "${value}" (direct match with "${key}")`);
+            mapped = true;
+            break;
+          }
+        }
+      }
+      
+      if (!mapped) {
+        console.log(`⚠️ No mapping found for field: "${fieldName}"`);
+      }
+    }
+    
+    console.log(`📊 Successfully mapped ${Object.keys(mappings).length} out of ${formFieldNames.length} form fields`);
+    return mappings;
+  }
+
   // New method that handles both manual and auto-created templates
   async fillPDFTemplateWithTemplate(template: Template, extractedFieldValues: Record<string, string>): Promise<Buffer> {
     try {
@@ -58,43 +146,14 @@ export class DocumentGenerationService {
         
         let fieldsFilledCount = 0;
         
-        // Enhanced field mapping for DIAN tax forms - match actual PDF form field names
-        const fieldMappings = {
-          // Exact matches for detected form fields
-          'YEAR': extractedFieldValues.year || '2023',
-          'FIRSTSURNAME': extractedFieldValues.first_surname || '',
-          'SECONDSURNAME': extractedFieldValues.second_surname || '',
-          'FIRST NAME': extractedFieldValues.first_name || '',
-          'Text Field0': extractedFieldValues.tax_id || extractedFieldValues.prior_year_return_number || '',
-          
-          // Common variations (in case PDF has different field names)
-          'year': extractedFieldValues.year || '2023',
-          'tax_id': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          'nit': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          'first_surname': extractedFieldValues.first_surname || '',
-          'second_surname': extractedFieldValues.second_surname || '',
-          'first_name': extractedFieldValues.first_name || '',
-          'other_names': extractedFieldValues.other_names || '',
-          'form_number': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          
-          // Additional variations
-          'Year': extractedFieldValues.year || '2023',
-          'Tax_ID': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          'NIT': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          'First_Surname': extractedFieldValues.first_surname || '',
-          'Second_Surname': extractedFieldValues.second_surname || '',
-          'First_Name': extractedFieldValues.first_name || '',
-          'Other_Names': extractedFieldValues.other_names || '',
-          'Form_Number': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          
-          // Numbered field variations
-          'field_1': extractedFieldValues.year || '2023',
-          'field_2': extractedFieldValues.tax_id || extractedFieldValues.number || '',
-          'field_3': extractedFieldValues.first_surname || '',
-          'field_4': extractedFieldValues.second_surname || '',
-          'field_5': extractedFieldValues.first_name || '',
-          'field_6': extractedFieldValues.other_names || '',
-        };
+        // Dynamic field mapping - intelligently map extracted data to ALL discovered form fields
+        console.log('🔍 Creating intelligent field mappings for all discovered form fields...');
+        console.log('📋 Available extracted data:', Object.keys(extractedFieldValues));
+        
+        const fieldMappings = this.createIntelligentFieldMappings(
+          fields.map(f => f.getName()), 
+          extractedFieldValues
+        );
         
         // Try all field mappings
         for (const [mappingName, value] of Object.entries(fieldMappings)) {
