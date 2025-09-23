@@ -331,6 +331,9 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
 
+    // 🚀 Initialize document types and versions first
+    await this.initializeDefaultData();
+
     // Check if default template already exists (by name since we can't use string ID)
     const { data: existingTemplates, error: checkError } = await supabase
       .from('templates')
@@ -344,7 +347,10 @@ export class SupabaseStorage implements IStorage {
       throw checkError;
     }
     
-    if (existingTemplates && existingTemplates.length > 0) return;
+    if (existingTemplates && existingTemplates.length > 0) {
+      console.log('✅ Default template already exists, skipping template creation');
+      return;
+    }
 
     // Add default marriage certificate template
     const defaultFieldMappings: TemplateFieldMappings = {
