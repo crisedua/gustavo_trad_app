@@ -183,6 +183,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Template name is required" });
       }
 
+      // Check for duplicate template names
+      const allTemplates = await storage.getTemplates();
+      const duplicateName = allTemplates.find((t: any) => 
+        t.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+      
+      if (duplicateName) {
+        // Clean up uploaded file
+        try {
+          fs.unlinkSync(templateFile.path);
+        } catch (cleanupError) {
+          console.warn('Failed to clean up temp file:', templateFile.path);
+        }
+        
+        console.log(`❌ Duplicate template name "${name}" already exists`);
+        return res.status(409).json({ 
+          error: `Template name "${name}" already exists. Please choose a different name.` 
+        });
+      }
+
       // Validate file type
       const fileValidation = validateFileType(templateFile);
       if (!fileValidation.valid) {
@@ -377,9 +397,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const templateId = req.params.id;
       
+      console.log(`📝 Template update request for ID: ${templateId}`, req.body);
+      
       // Check if template exists
       const existingTemplate = await storage.getTemplate(templateId);
       if (!existingTemplate) {
+        console.log(`❌ Template ${templateId} not found`);
         return res.status(404).json({ error: "Template not found" });
       }
 
@@ -391,12 +414,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Template name cannot be empty" });
       }
 
+      // Check for duplicate template names (excluding current template)
+      if (updates.name && updates.name.trim() !== existingTemplate.name) {
+        const allTemplates = await storage.getTemplates();
+        const duplicateName = allTemplates.find((t: any) => 
+          t.id !== templateId && 
+          t.name.toLowerCase().trim() === updates.name!.toLowerCase().trim()
+        );
+        
+        if (duplicateName) {
+          console.log(`❌ Duplicate template name "${updates.name}" already exists`);
+          return res.status(409).json({ 
+            error: `Template name "${updates.name}" already exists. Please choose a different name.` 
+          });
+        }
+      }
+
+      console.log(`✅ Updating template ${templateId} with:`, updates);
+
       // Update the template
       const updatedTemplate = await storage.updateTemplate(templateId, updates);
       if (!updatedTemplate) {
+        console.log(`❌ Failed to update template ${templateId}`);
         return res.status(500).json({ error: "Failed to update template" });
       }
 
+      console.log(`✅ Template ${templateId} updated successfully: "${updatedTemplate.name}"`);
       res.json(updatedTemplate);
     } catch (error) {
       console.error("Error updating template:", error);
@@ -420,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if template is being used by any processing jobs
       const jobs = await storage.getProcessingJobs();
-      const templatesInUse = jobs.filter(job => job.templateId === templateId);
+      const templatesInUse = jobs.filter((job: any) => job.templateId === templateId);
       
       if (templatesInUse.length > 0 && !force) {
         return res.status(400).json({ 
