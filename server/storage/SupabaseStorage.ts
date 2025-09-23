@@ -216,6 +216,9 @@ export class SupabaseStorage implements IStorage {
       extractedFieldValues: data.extracted_field_values,
       generatedDocumentPath: data.generated_document_path,
       errorMessage: data.error_message,
+      selectedDocumentTypeId: data.selected_document_type_id,
+      detectedVersionId: data.detected_version_id,
+      versionDetectionResults: data.version_detection_results,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
@@ -246,6 +249,9 @@ export class SupabaseStorage implements IStorage {
       extractedFieldValues: data.extracted_field_values,
       generatedDocumentPath: data.generated_document_path,
       errorMessage: data.error_message,
+      selectedDocumentTypeId: data.selected_document_type_id,
+      detectedVersionId: data.detected_version_id,
+      versionDetectionResults: data.version_detection_results,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
@@ -275,6 +281,9 @@ export class SupabaseStorage implements IStorage {
       extractedFieldValues: job.extracted_field_values,
       generatedDocumentPath: job.generated_document_path,
       errorMessage: job.error_message,
+      selectedDocumentTypeId: job.selected_document_type_id,
+      detectedVersionId: job.detected_version_id,
+      versionDetectionResults: job.version_detection_results,
       createdAt: job.created_at,
       updatedAt: job.updated_at
     }));
