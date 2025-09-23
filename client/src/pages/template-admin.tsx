@@ -220,26 +220,55 @@ export default function TemplateAdmin() {
     }
   });
 
-  // Update template mutation
+  // Track if update is in progress to prevent duplicates
+  const updateInProgress = useRef(false);
+
+  // Update template mutation with duplicate prevention
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: { name?: string; description?: string } }) => {
-      const res = await apiRequest('PATCH', `/api/templates/${id}`, updates);
-      return res.json();
+      // Prevent duplicate requests
+      if (updateInProgress.current) {
+        throw new Error('Update already in progress');
+      }
+      
+      updateInProgress.current = true;
+      
+      try {
+        const res = await apiRequest('PATCH', `/api/templates/${id}`, updates);
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to update template');
+        }
+        return res.json();
+      } finally {
+        updateInProgress.current = false;
+      }
     },
     onSuccess: (data) => {
+      // Use a more specific query invalidation
       queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
-      setIsEditModalOpen(false);
-      setEditingTemplate(null);
-      setEditForm({ name: '', description: '' });
+      
+      // Wait a bit before clearing form to ensure UI consistency
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+        setEditingTemplate(null);
+        setEditForm({ name: '', description: '' });
+      }, 100);
+      
       toast({
         title: "Template Updated",
-        description: "Template has been successfully updated.",
+        description: `Template "${data.name}" has been successfully updated.`,
       });
     },
     onError: (error: any) => {
+      updateInProgress.current = false; // Reset flag on error
+      
+      const errorMessage = error.message || "Failed to update template";
+      console.error('Template update error:', error);
+      
       toast({
         title: "Update Failed",
-        description: error.message || "Failed to update template",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -255,9 +284,18 @@ export default function TemplateAdmin() {
     setIsEditModalOpen(true);
   };
 
-  // Handle update template
-  const handleUpdateTemplate = () => {
-    if (!editingTemplate) return;
+  // Debounced update template handler with additional safeguards
+  const handleUpdateTemplate = useCallback(() => {
+    if (!editingTemplate) {
+      console.warn('No editing template selected');
+      return;
+    }
+    
+    // Prevent multiple rapid clicks
+    if (updateTemplateMutation.isPending || updateInProgress.current) {
+      console.log('Update already in progress, ignoring click');
+      return;
+    }
     
     if (!editForm.name.trim()) {
       toast({
@@ -283,11 +321,15 @@ export default function TemplateAdmin() {
         title: "No Changes",
         description: "No changes were made to the template.",
       });
+      setIsEditModalOpen(false);
+      setEditingTemplate(null);
+      setEditForm({ name: '', description: '' });
       return;
     }
 
+    console.log('Initiating template update:', { id: editingTemplate.id, updates });
     updateTemplateMutation.mutate({ id: editingTemplate.id, updates });
-  };
+  }, [editingTemplate, editForm, updateTemplateMutation, toast]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
