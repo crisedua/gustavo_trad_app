@@ -759,7 +759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 🔍 AUTOMATIC DOCUMENT VERSION DETECTION
       console.log('🔍 Starting automatic document version detection...');
-      let selectedTemplate: Template | undefined = undefined;
+      let selectedTemplate: any | undefined = undefined;
       
       // For now, assume marriage certificate type (can be extended for other document types)
       const marriageDocType = await storage.getDocumentTypeByCode('marriage_certificate');
