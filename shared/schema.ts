@@ -9,6 +9,37 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+// Document Types table for organizing templates by category
+export const documentTypes = pgTable("document_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // "Birth Certificate", "Marriage Certificate", etc.
+  code: text("code").notNull().unique(), // "birth_certificate", "marriage_certificate", etc.
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Document Versions table for managing different versions of the same document type
+export const documentVersions = pgTable("document_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentTypeId: varchar("document_type_id").references(() => documentTypes.id).notNull(),
+  name: text("name").notNull(), // "Old Format", "New Format", "Digital Format", etc.
+  code: text("code").notNull(), // "old_format", "new_format", "digital_format", etc.
+  description: text("description"),
+  // AI detection patterns to identify this version
+  detectionPatterns: jsonb("detection_patterns").$type<{
+    keywords: string[]; // Required keywords that indicate this version
+    excludeKeywords?: string[]; // Keywords that exclude this version
+    layoutIndicators?: string[]; // Visual/structural indicators
+    confidence: number; // Base confidence for this pattern
+    language?: string; // Target language for this version
+  }>(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const templates = pgTable("templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -17,6 +48,10 @@ export const templates = pgTable("templates", {
   // Enhanced fields for automated template creation
   isAutoCreated: boolean("is_auto_created").default(false),
   sourceDocumentPath: text("source_document_path"),
+  // Link to document type and version for AI-powered selection
+  documentTypeId: varchar("document_type_id").references(() => documentTypes.id),
+  documentVersionId: varchar("document_version_id").references(() => documentVersions.id),
+  // Legacy field for backward compatibility
   templateType: text("template_type"), // 'marriage_certificate', 'birth_certificate', 'custom', etc.
   detectionMetadata: jsonb("detection_metadata").$type<{
     detectionMethod?: string;
@@ -129,9 +164,33 @@ export const processingJobs = pgTable("processing_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   originalFilePath: text("original_file_path").notNull(),
   userEmail: text("user_email").notNull(),
-  status: text("status").notNull(), // 'pending_review', 'uploading', 'ocr', 'extraction', 'mapping', 'generation', 'completed', 'error'
+  // Enhanced status to include version detection step
+  status: text("status").notNull(), // 'pending_review', 'uploading', 'ocr', 'version_detection', 'extraction', 'mapping', 'generation', 'completed', 'error'
   extractedData: jsonb("extracted_data").$type<Record<string, string>>(),
+  // User-selected document type (replaces manual template selection)
+  selectedDocumentTypeId: varchar("selected_document_type_id").references(() => documentTypes.id),
+  // AI-detected document version and template
+  detectedVersionId: varchar("detected_version_id").references(() => documentVersions.id),
   templateId: varchar("template_id").references(() => templates.id),
+  // Version detection results from AI
+  versionDetectionResults: jsonb("version_detection_results").$type<{
+    detectedVersions: Array<{
+      versionId: string;
+      versionName: string;
+      confidence: number;
+      matchedPatterns: string[];
+      reasoning: string;
+    }>;
+    selectedVersion?: {
+      versionId: string;
+      confidence: number;
+      autoSelected: boolean;
+      fallbackReason?: string;
+    };
+    ocrText?: string; // Processed OCR text used for detection
+    processingTime?: number;
+    errorMessage?: string;
+  }>(),
   // Renamed for clarity: this represents field names mapped to their extracted/filled values
   extractedFieldValues: jsonb("extracted_field_values").$type<Record<string, string>>(),
   generatedDocumentPath: text("generated_document_path"),
@@ -243,6 +302,35 @@ export const templateDetectionMetadataSchema = z.object({
   ocrAccuracy: z.number().min(0).max(1).optional(),
 });
 
+// Document version detection patterns schema
+export const detectionPatternsSchema = z.object({
+  keywords: z.array(z.string()).min(1),
+  excludeKeywords: z.array(z.string()).optional(),
+  layoutIndicators: z.array(z.string()).optional(),
+  confidence: z.number().min(0).max(1),
+  language: z.string().optional(),
+});
+
+// Version detection results schema
+export const versionDetectionResultsSchema = z.object({
+  detectedVersions: z.array(z.object({
+    versionId: z.string(),
+    versionName: z.string(),
+    confidence: z.number().min(0).max(1),
+    matchedPatterns: z.array(z.string()),
+    reasoning: z.string(),
+  })),
+  selectedVersion: z.object({
+    versionId: z.string(),
+    confidence: z.number().min(0).max(1),
+    autoSelected: z.boolean(),
+    fallbackReason: z.string().optional(),
+  }).optional(),
+  ocrText: z.string().optional(),
+  processingTime: z.number().min(0).optional(),
+  errorMessage: z.string().optional(),
+});
+
 // Cross-field validation rules schema
 export const crossFieldValidationRuleSchema = z.object({
   name: z.string().min(1),
@@ -276,12 +364,55 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+export const insertDocumentTypeSchema = createInsertSchema(documentTypes).pick({
+  name: true,
+  code: true,
+  description: true,
+  isActive: true,
+}).partial({
+  description: true,
+  isActive: true,
+});
+
+export const updateDocumentTypeSchema = createInsertSchema(documentTypes).pick({
+  name: true,
+  code: true,
+  description: true,
+  isActive: true,
+}).partial();
+
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions).pick({
+  documentTypeId: true,
+  name: true,
+  code: true,
+  description: true,
+  detectionPatterns: true,
+  isActive: true,
+}).partial({
+  description: true,
+  isActive: true,
+}).extend({
+  detectionPatterns: detectionPatternsSchema,
+});
+
+export const updateDocumentVersionSchema = createInsertSchema(documentVersions).pick({
+  name: true,
+  code: true,
+  description: true,
+  detectionPatterns: true,
+  isActive: true,
+}).partial().extend({
+  detectionPatterns: detectionPatternsSchema.optional(),
+});
+
 export const insertTemplateSchema = createInsertSchema(templates).pick({
   name: true,
   description: true,
   filePath: true,
   isAutoCreated: true,
   sourceDocumentPath: true,
+  documentTypeId: true,
+  documentVersionId: true,
   templateType: true,
   detectionMetadata: true,
   fieldMappings: true,
@@ -289,6 +420,8 @@ export const insertTemplateSchema = createInsertSchema(templates).pick({
 }).partial({
   isAutoCreated: true,
   sourceDocumentPath: true,
+  documentTypeId: true,
+  documentVersionId: true,
   templateType: true,
   detectionMetadata: true,
   validationRules: true,
@@ -302,6 +435,8 @@ export const insertTemplateSchema = createInsertSchema(templates).pick({
 export const updateTemplateSchema = createInsertSchema(templates).pick({
   name: true,
   description: true,
+  documentTypeId: true,
+  documentVersionId: true,
   templateType: true,
   fieldMappings: true,
   validationRules: true,
@@ -316,12 +451,21 @@ export const insertProcessingJobSchema = createInsertSchema(processingJobs).pick
   userEmail: true,
   status: true,
   extractedData: true,
+  selectedDocumentTypeId: true,
+  detectedVersionId: true,
   templateId: true,
+  versionDetectionResults: true,
   extractedFieldValues: true,
+}).partial({
+  selectedDocumentTypeId: true,
+  detectedVersionId: true,
+  templateId: true,
+  versionDetectionResults: true,
 }).extend({
   // Add validation for extracted field values - require empty objects instead of null
   extractedData: z.record(z.string(), z.string()).default({}),
   extractedFieldValues: z.record(z.string(), z.string()).default({}),
+  versionDetectionResults: versionDetectionResultsSchema.optional(),
   // Add email validation
   userEmail: z.string().email("Please enter a valid email address"),
 });
@@ -344,6 +488,12 @@ export const templateFieldListSchema = z.object({
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type DocumentType = typeof documentTypes.$inferSelect;
+export type InsertDocumentType = z.infer<typeof insertDocumentTypeSchema>;
+export type UpdateDocumentType = z.infer<typeof updateDocumentTypeSchema>;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
+export type InsertDocumentVersion = z.infer<typeof insertDocumentVersionSchema>;
+export type UpdateDocumentVersion = z.infer<typeof updateDocumentVersionSchema>;
 export type Template = typeof templates.$inferSelect;
 export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
 export type UpdateTemplate = z.infer<typeof updateTemplateSchema>;
@@ -353,6 +503,8 @@ export type InsertProcessingJob = z.infer<typeof insertProcessingJobSchema>;
 // Comprehensive types for the new schema structure
 export type AutoTemplateCreation = z.infer<typeof autoTemplateCreationSchema>;
 export type TemplateFieldList = z.infer<typeof templateFieldListSchema>;
+export type DetectionPatterns = z.infer<typeof detectionPatternsSchema>;
+export type VersionDetectionResults = z.infer<typeof versionDetectionResultsSchema>;
 
 // PDF and field mapping types
 export type PdfCoordinates = z.infer<typeof pdfCoordinatesSchema>;
