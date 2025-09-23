@@ -56,10 +56,11 @@ export class SupabaseStorage implements IStorage {
         file_path: insertTemplate.filePath,
         is_auto_created: insertTemplate.isAutoCreated,
         source_document_path: insertTemplate.sourceDocumentPath,
+        document_type_id: insertTemplate.documentTypeId,
+        document_version_id: insertTemplate.documentVersionId,
         template_type: insertTemplate.templateType,
         detection_metadata: insertTemplate.detectionMetadata,
-        field_mappings: insertTemplate.fieldMappings,  // snake_case column
-        fieldMappings: insertTemplate.fieldMappings,   // camelCase column
+        field_mappings: insertTemplate.fieldMappings,
         validation_rules: insertTemplate.validationRules,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -71,7 +72,24 @@ export class SupabaseStorage implements IStorage {
       console.error('Error creating template:', error);
       throw error;
     }
-    return data;
+    
+    // Map snake_case database columns to camelCase TypeScript properties
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      filePath: data.file_path,
+      isAutoCreated: data.is_auto_created,
+      sourceDocumentPath: data.source_document_path,
+      documentTypeId: data.document_type_id,
+      documentVersionId: data.document_version_id,
+      templateType: data.template_type,
+      detectionMetadata: data.detection_metadata,
+      fieldMappings: data.field_mappings,
+      validationRules: data.validation_rules,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async getTemplate(id: string): Promise<Template | undefined> {
@@ -96,9 +114,11 @@ export class SupabaseStorage implements IStorage {
       filePath: data.file_path,
       isAutoCreated: data.is_auto_created,
       sourceDocumentPath: data.source_document_path,
+      documentTypeId: data.document_type_id,
+      documentVersionId: data.document_version_id,
       templateType: data.template_type,
       detectionMetadata: data.detection_metadata,
-      fieldMappings: data.field_mappings || data.fieldMappings, // Support both columns
+      fieldMappings: data.field_mappings,
       validationRules: data.validation_rules,
       createdAt: data.created_at,
       updatedAt: data.updated_at
@@ -130,7 +150,7 @@ export class SupabaseStorage implements IStorage {
       documentVersionId: template.document_version_id,
       templateType: template.template_type,
       detectionMetadata: template.detection_metadata,
-      fieldMappings: template.field_mappings || template.fieldMappings, // Support both columns
+      fieldMappings: template.field_mappings,
       validationRules: template.validation_rules,
       createdAt: template.created_at,
       updatedAt: template.updated_at
@@ -747,5 +767,280 @@ export class SupabaseStorage implements IStorage {
     }
     
     console.log('🎉 Document types and versions initialization complete');
+  }
+
+  // Document type methods
+  async createDocumentType(documentType: InsertDocumentType): Promise<DocumentType> {
+    const { data, error } = await supabase
+      .from('document_types')
+      .insert({
+        name: documentType.name,
+        code: documentType.code,
+        description: documentType.description,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating document type:', error);
+      throw error;
+    }
+    
+    return {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      isActive: data.is_active ?? true,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  async getDocumentType(id: string): Promise<DocumentType | undefined> {
+    const { data, error } = await supabase
+      .from('document_types')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching document type:', error);
+      return undefined;
+    }
+    
+    if (!data) return undefined;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      isActive: data.is_active ?? true,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  async getDocumentTypes(): Promise<DocumentType[]> {
+    const { data, error } = await supabase
+      .from('document_types')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching document types:', error);
+      return [];
+    }
+    
+    if (!data) return [];
+    
+    return data.map(type => ({
+      id: type.id,
+      name: type.name,
+      code: type.code,
+      description: type.description,
+      isActive: type.is_active ?? true,
+      createdAt: type.created_at,
+      updatedAt: type.updated_at
+    }));
+  }
+
+  async getDocumentTypeByCode(code: string): Promise<DocumentType | undefined> {
+    const { data, error } = await supabase
+      .from('document_types')
+      .select('*')
+      .eq('code', code)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching document type by code:', error);
+      return undefined;
+    }
+    
+    if (!data) return undefined;
+    
+    return {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      isActive: data.is_active ?? true,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  // Document version methods
+  async createDocumentVersion(documentVersion: InsertDocumentVersion): Promise<DocumentVersion> {
+    const { data, error } = await supabase
+      .from('document_versions')
+      .insert({
+        document_type_id: documentVersion.documentTypeId,
+        name: documentVersion.name,
+        code: documentVersion.code,
+        description: documentVersion.description,
+        detection_patterns: documentVersion.detectionPatterns,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating document version:', error);
+      throw error;
+    }
+    
+    return {
+      id: data.id,
+      documentTypeId: data.document_type_id,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      detectionPatterns: data.detection_patterns,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  async getDocumentVersion(id: string): Promise<DocumentVersion | undefined> {
+    const { data, error } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching document version:', error);
+      return undefined;
+    }
+    
+    if (!data) return undefined;
+    
+    return {
+      id: data.id,
+      documentTypeId: data.document_type_id,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      detectionPatterns: data.detection_patterns,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  async getDocumentVersionsByType(documentTypeId: string): Promise<DocumentVersion[]> {
+    const { data, error } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('document_type_id', documentTypeId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching document versions by type:', error);
+      return [];
+    }
+    
+    if (!data) return [];
+    
+    return data.map(version => ({
+      id: version.id,
+      documentTypeId: version.document_type_id,
+      name: version.name,
+      code: version.code,
+      description: version.description,
+      detectionPatterns: version.detection_patterns,
+      isActive: version.is_active,
+      createdAt: version.created_at,
+      updatedAt: version.updated_at
+    }));
+  }
+
+  async detectDocumentVersion(ocrText: string, documentTypeId: string): Promise<DocumentVersion | undefined> {
+    const versions = await this.getDocumentVersionsByType(documentTypeId);
+    
+    let bestMatch: DocumentVersion | undefined = undefined;
+    let highestConfidence = 0;
+    
+    for (const version of versions) {
+      if (!version.detectionPatterns) continue;
+      
+      const patterns = version.detectionPatterns;
+      let confidence = patterns.confidence || 0.5;
+      
+      // Check for required keywords
+      if (patterns.keywords) {
+        const keywordMatches = patterns.keywords.filter(keyword => 
+          ocrText.toLowerCase().includes(keyword.toLowerCase())
+        ).length;
+        confidence *= (keywordMatches / patterns.keywords.length);
+      }
+      
+      // Check for exclusion keywords
+      if (patterns.excludeKeywords) {
+        const excludeMatches = patterns.excludeKeywords.filter(keyword => 
+          ocrText.toLowerCase().includes(keyword.toLowerCase())
+        ).length;
+        if (excludeMatches > 0) {
+          confidence *= 0.1; // Heavily penalize if exclude keywords are found
+        }
+      }
+      
+      // Check for layout indicators
+      if (patterns.layoutIndicators) {
+        const layoutMatches = patterns.layoutIndicators.filter(indicator => 
+          ocrText.toLowerCase().includes(indicator.toLowerCase())
+        ).length;
+        if (layoutMatches > 0) {
+          confidence *= 1.2; // Boost confidence for layout indicators
+        }
+      }
+      
+      if (confidence > highestConfidence && confidence > 0.3) {
+        highestConfidence = confidence;
+        bestMatch = version;
+      }
+    }
+    
+    return bestMatch;
+  }
+
+  async getTemplatesByVersion(documentVersionId: string): Promise<Template[]> {
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('document_version_id', documentVersionId);
+    
+    if (error) {
+      console.error('Error fetching templates by version:', error);
+      return [];
+    }
+    
+    if (!data) return [];
+    
+    return data.map(template => ({
+      id: template.id,
+      name: template.name,
+      description: template.description,
+      filePath: template.file_path,
+      isAutoCreated: template.is_auto_created,
+      sourceDocumentPath: template.source_document_path,
+      documentTypeId: template.document_type_id,
+      documentVersionId: template.document_version_id,
+      templateType: template.template_type,
+      detectionMetadata: template.detection_metadata,
+      fieldMappings: template.field_mappings,
+      validationRules: template.validation_rules,
+      createdAt: template.created_at,
+      updatedAt: template.updated_at
+    }));
   }
 }
