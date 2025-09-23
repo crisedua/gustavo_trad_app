@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js';
-import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser, type TemplateFieldMappings } from "@shared/schema";
+import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser, type TemplateFieldMappings, type DocumentType, type InsertDocumentType, type DocumentVersion, type InsertDocumentVersion } from "@shared/schema";
 import { type IStorage } from '../storage.js';
 
 export class SupabaseStorage implements IStorage {
@@ -628,5 +628,107 @@ export class SupabaseStorage implements IStorage {
       console.error('Error creating default template:', error);
       throw error;
     }
+  }
+
+  // Initialize default document types, versions, and templates
+  async initializeDefaultData(): Promise<void> {
+    console.log('🚀 Initializing default document types and versions...');
+    
+    // Create Marriage Certificate document type
+    let marriageDocType: DocumentType;
+    const existingType = await this.getDocumentTypeByCode('marriage_certificate');
+    
+    if (existingType) {
+      marriageDocType = existingType;
+      console.log('✅ Marriage Certificate document type already exists');
+    } else {
+      marriageDocType = await this.createDocumentType({
+        name: 'Marriage Certificate',
+        code: 'marriage_certificate',
+        description: 'Official marriage certificates from civil registry'
+      });
+      console.log('✅ Created Marriage Certificate document type');
+    }
+    
+    // Create Old Format version
+    const { data: existingOldVersion } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('document_type_id', marriageDocType.id)
+      .eq('code', 'old_format')
+      .single();
+    
+    if (!existingOldVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: marriageDocType.id,
+        name: 'Old Format',
+        code: 'old_format',
+        description: 'Traditional handwritten or typewritten format from pre-digital era',
+        detectionPatterns: {
+          keywords: [
+            'REGISTRO DEL ESTADO CIVIL',
+            'REGISTRO CIVIL',
+            'MATRIMONIO',
+            'REGISTRO NACIONAL DEL ESTADO CIVIL',
+            'CERTIFICADO DE MATRIMONIO'
+          ],
+          excludeKeywords: [
+            'DIGITAL',
+            'QR',
+            'DIGITALLY SIGNED',
+            'FIRMADO DIGITALMENTE'
+          ],
+          layoutIndicators: [
+            'STAMP',
+            'SELLO',
+            'CIRCULAR STAMP',
+            'HANDWRITTEN'
+          ],
+          confidence: 0.8,
+          language: 'es'
+        }
+      });
+      console.log('✅ Created Old Format document version');
+    }
+    
+    // Create New Format version
+    const { data: existingNewVersion } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('document_type_id', marriageDocType.id)
+      .eq('code', 'new_format')
+      .single();
+    
+    if (!existingNewVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: marriageDocType.id,
+        name: 'New Format',
+        code: 'new_format',
+        description: 'Modern digital format with QR codes and digital signatures',
+        detectionPatterns: {
+          keywords: [
+            'NATIONAL CIVIL REGISTRY',
+            'DIGITAL CIVIL STATUS REGISTRATION',
+            'QR',
+            'DIGITALLY SIGNED',
+            'FIRMADO DIGITALMENTE'
+          ],
+          excludeKeywords: [
+            'HANDWRITTEN',
+            'TYPEWRITTEN'
+          ],
+          layoutIndicators: [
+            'QR CODE',
+            'COAT OF ARMS',
+            'SERIAL INDICATOR'
+          ],
+          confidence: 0.9,
+          language: 'en'
+        }
+      });
+      console.log('✅ Created New Format document version');
+    }
+    
+    console.log('🎉 Document types and versions initialization complete');
   }
 }
