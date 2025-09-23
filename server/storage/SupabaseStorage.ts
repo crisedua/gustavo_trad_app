@@ -126,6 +126,8 @@ export class SupabaseStorage implements IStorage {
       filePath: template.file_path,
       isAutoCreated: template.is_auto_created,
       sourceDocumentPath: template.source_document_path,
+      documentTypeId: template.document_type_id,
+      documentVersionId: template.document_version_id,
       templateType: template.template_type,
       detectionMetadata: template.detection_metadata,
       fieldMappings: template.field_mappings || template.fieldMappings, // Support both columns
