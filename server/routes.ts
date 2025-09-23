@@ -754,30 +754,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const ocrResult = await ocrService.extractTextFromFile(job.originalFilePath);
       
-      // Update job with OCR results
-      await storage.updateProcessingJob(job.id, { 
-        status: 'extraction'
-      });
+      // Update status to version detection
+      await storage.updateProcessingJob(job.id, { status: 'version_detection' });
 
-      // If a template is selected, perform field extraction
-      if (job.templateId) {
-        console.log('Starting field extraction for job:', job.id, 'with template:', job.templateId);
+      // 🔍 AUTOMATIC DOCUMENT VERSION DETECTION
+      console.log('🔍 Starting automatic document version detection...');
+      let selectedTemplate: Template | undefined = undefined;
+      
+      // For now, assume marriage certificate type (can be extended for other document types)
+      const marriageDocType = await storage.getDocumentTypeByCode('marriage_certificate');
+      
+      if (marriageDocType) {
+        console.log('📋 Found marriage certificate document type:', marriageDocType.id);
         
-        const template = await storage.getTemplate(job.templateId);
-        if (template) {
-          // Extract field values using the template
-          const extractedFields = await fieldExtractionService.extractFieldsForTemplate(
-            ocrResult,
-            template
-          );
+        // Detect the specific version (old vs new format)
+        const detectedVersion = await storage.detectDocumentVersion(ocrResult, marriageDocType.id);
+        
+        if (detectedVersion) {
+          console.log('✅ Document version detected:', detectedVersion.name, '(' + detectedVersion.code + ')');
           
-          // Update job with extracted field values
-          await storage.updateProcessingJob(job.id, {
-            status: 'mapping',
-            extractedData: extractedFields,
-            extractedFieldValues: extractedFields
-          });
+          // Find templates for this version
+          const templatesForVersion = await storage.getTemplatesByVersion(detectedVersion.id);
+          
+          if (templatesForVersion.length > 0) {
+            selectedTemplate = templatesForVersion[0]; // Use first available template
+            console.log('🎯 Selected template:', selectedTemplate.name, '(' + selectedTemplate.id + ')');
+            
+            // Update job with detected version and selected template
+            await storage.updateProcessingJob(job.id, {
+              detectedVersionId: detectedVersion.id,
+              templateId: selectedTemplate.id,
+              versionDetectionResults: {
+                detectedVersions: [{
+                  versionId: detectedVersion.id,
+                  versionName: detectedVersion.name,
+                  confidence: detectedVersion.detectionPatterns?.confidence || 0.8,
+                  matchedPatterns: detectedVersion.detectionPatterns?.keywords || [],
+                  reasoning: `Detected based on keywords and layout patterns`
+                }],
+                selectedVersion: {
+                  versionId: detectedVersion.id,
+                  confidence: detectedVersion.detectionPatterns?.confidence || 0.8,
+                  autoSelected: true
+                },
+                ocrText: ocrResult.substring(0, 500), // Store first 500 chars
+                processingTime: Date.now()
+              }
+            });
+          } else {
+            console.log('⚠️ No templates found for detected version:', detectedVersion.name);
+          }
+        } else {
+          console.log('❌ Could not detect document version automatically');
+          
+          // Fallback to manual template selection if provided
+          if (job.templateId) {
+            selectedTemplate = await storage.getTemplate(job.templateId);
+            console.log('🔄 Falling back to manually selected template:', selectedTemplate?.name);
+          }
         }
+      } else {
+        console.log('❌ Marriage certificate document type not found in database');
+        
+        // Fallback to manual template selection if provided
+        if (job.templateId) {
+          selectedTemplate = await storage.getTemplate(job.templateId);
+          console.log('🔄 Using manually selected template:', selectedTemplate?.name);
+        }
+      }
+      
+      // Update job status to extraction
+      await storage.updateProcessingJob(job.id, { status: 'extraction' });
+
+      // Perform field extraction with automatically selected or fallback template
+      if (selectedTemplate) {
+        console.log('Starting field extraction for job:', job.id, 'with template:', selectedTemplate.id);
+        
+        // Extract field values using the template
+        const extractedFields = await fieldExtractionService.extractFieldsForTemplate(
+          ocrResult,
+          selectedTemplate
+        );
+        
+        // Update job with extracted field values
+        await storage.updateProcessingJob(job.id, {
+          status: 'mapping',
+          extractedData: extractedFields,
+          extractedFieldValues: extractedFields
+        });
+      } else {
+        console.log('⚠️ No template available for field extraction');
+        
+        // Update job with extracted OCR text only
+        await storage.updateProcessingJob(job.id, {
+          status: 'extraction',
+          extractedData: { raw_ocr_text: ocrResult },
+          extractedFieldValues: {}
+        });
       }
 
       // Update final status to pending_review for admin to verify
