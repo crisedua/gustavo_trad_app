@@ -293,7 +293,7 @@ export class MemStorage implements IStorage {
 
     const defaultTemplate: Template = {
       id: "default-marriage-cert",
-      name: "Marriage Certificate Template",
+      name: "Marriage Certificate - Default Format",
       description: "National Civil Registry format",
       filePath: "/public-objects/templates/marriage_certificate_template.pdf",
       fieldMappings: defaultFieldMappings,
@@ -320,6 +320,388 @@ export class MemStorage implements IStorage {
       updatedAt: new Date()
     };
     this.templates.set(defaultTemplate.id, defaultTemplate);
+
+    // Add Birth Certificate - Old Format template
+    const birthOldFieldMappings: TemplateFieldMappings = {
+      "registro_no": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 750, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Registry Number',
+          description: 'Official registry number',
+          validation: { required: true, maxLength: 50 }
+        }
+      },
+      "given_names": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 650, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Given Names',
+          description: 'First and middle names',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "surnames": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 600, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Surnames',
+          description: 'Family surnames',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "date_of_birth": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 550, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'date',
+          label: 'Date of Birth',
+          description: 'Date of birth',
+          validation: { required: true, format: 'date' },
+          displayOptions: { dateFormat: 'DD/MM/YYYY' }
+        }
+      },
+      "place_of_birth": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 500, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Place of Birth',
+          description: 'Municipality and department of birth',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "sex": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 450, width: 100, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'select',
+          label: 'Sex',
+          description: 'Biological sex',
+          validation: { required: true },
+          displayOptions: { 
+            options: ['M', 'F', 'Masculino', 'Femenino'] 
+          }
+        }
+      },
+      "father_names": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 350, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Father Names',
+          description: 'Father full names',
+          validation: { required: false, maxLength: 200 }
+        }
+      },
+      "mother_names": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 300, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Mother Names',
+          description: 'Mother full names',
+          validation: { required: false, maxLength: 200 }
+        }
+      }
+    };
+
+    const birthOldTemplate: Template = {
+      id: "birth-cert-old-format",
+      name: "Birth Certificate - Old Format",
+      description: "Traditional handwritten/typewritten birth certificate",
+      filePath: "/public-objects/templates/birth_certificate_old_template.pdf",
+      fieldMappings: birthOldFieldMappings,
+      isAutoCreated: false,
+      sourceDocumentPath: null,
+      documentTypeId: null,
+      documentVersionId: null,
+      templateType: "birth_certificate",
+      detectionMetadata: {
+        detectionMethod: "template_predefined",
+        confidence: 1.0,
+        totalMarkersFound: Object.keys(birthOldFieldMappings).length,
+        processingTime: 0,
+        ocrAccuracy: 1.0
+      },
+      validationRules: {
+        globalRules: {
+          requireAllFields: false,
+          allowPartialFill: true,
+          formCompletionThreshold: 70
+        }
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.templates.set(birthOldTemplate.id, birthOldTemplate);
+
+    // Add Birth Certificate - New Format template
+    const birthNewFieldMappings: TemplateFieldMappings = {
+      "qr_code": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 50, y: 750, width: 80, height: 80 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'QR Code',
+          description: 'Digital verification QR code',
+          validation: { required: false, maxLength: 200 }
+        }
+      },
+      "serial_number": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 150, y: 750, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Serial Number',
+          description: 'Digital certificate serial number',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "country": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 700, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Country',
+          description: 'Country of birth registration',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "department": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 650, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Department',
+          description: 'Department or state',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "municipality": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 600, width: 200, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Municipality',
+          description: 'Municipality of registration',
+          validation: { required: true, maxLength: 100 }
+        }
+      },
+      "given_names": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 500, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Given Names',
+          description: 'First and middle names',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "surnames": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 450, width: 300, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'text',
+          label: 'Surnames',
+          description: 'Family surnames',
+          validation: { required: true, maxLength: 200 }
+        }
+      },
+      "date_of_birth": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 100, y: 400, width: 150, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'date',
+          label: 'Date of Birth',
+          description: 'Date of birth',
+          validation: { required: true, format: 'date' },
+          displayOptions: { dateFormat: 'YYYY-MM-DD' }
+        }
+      },
+      "sex": {
+        instances: [{
+          coordinates: {
+            page: 1,
+            rect: { x: 300, y: 400, width: 100, height: 20 },
+            units: 'pdf_points',
+            origin: 'bottom-left'
+          },
+          detectionConfidence: 0.95,
+          detectionMethod: 'template_predefined'
+        }],
+        fieldDefinition: {
+          type: 'select',
+          label: 'Sex',
+          description: 'Biological sex',
+          validation: { required: true },
+          displayOptions: { 
+            options: ['M', 'F'] 
+          }
+        }
+      }
+    };
+
+    const birthNewTemplate: Template = {
+      id: "birth-cert-new-format",
+      name: "Birth Certificate - New Format",
+      description: "Modern digital birth certificate with QR codes",
+      filePath: "/public-objects/templates/birth_certificate_new_template.pdf",
+      fieldMappings: birthNewFieldMappings,
+      isAutoCreated: false,
+      sourceDocumentPath: null,
+      documentTypeId: null,
+      documentVersionId: null,
+      templateType: "birth_certificate",
+      detectionMetadata: {
+        detectionMethod: "template_predefined",
+        confidence: 1.0,
+        totalMarkersFound: Object.keys(birthNewFieldMappings).length,
+        processingTime: 0,
+        ocrAccuracy: 1.0
+      },
+      validationRules: {
+        globalRules: {
+          requireAllFields: true,
+          allowPartialFill: false,
+          formCompletionThreshold: 90
+        }
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.templates.set(birthNewTemplate.id, birthNewTemplate);
   }
 
   // User methods
@@ -617,6 +999,93 @@ export class MemStorage implements IStorage {
         }
       });
       console.log('✅ Created New Format document version');
+    }
+    
+    // Create Birth Certificate document type
+    let birthDocType: DocumentType;
+    const existingBirthType = await this.getDocumentTypeByCode('birth_certificate');
+    
+    if (existingBirthType) {
+      birthDocType = existingBirthType;
+      console.log('✅ Birth Certificate document type already exists');
+    } else {
+      birthDocType = await this.createDocumentType({
+        name: 'Birth Certificate',
+        code: 'birth_certificate',
+        description: 'Official birth certificates from civil registry'
+      });
+      console.log('✅ Created Birth Certificate document type');
+    }
+    
+    // Create Birth Certificate Old Format version
+    const existingBirthOldVersions = await this.getDocumentVersionsByType(birthDocType.id);
+    const existingBirthOldVersion = existingBirthOldVersions.find(v => v.code === 'old_format');
+    
+    if (!existingBirthOldVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: birthDocType.id,
+        name: 'Old Format',
+        code: 'old_format',
+        description: 'Traditional handwritten or typewritten birth certificate format',
+        detectionPatterns: {
+          keywords: [
+            'REGISTRO DEL ESTADO CIVIL',
+            'REGISTRO CIVIL',
+            'NACIMIENTO',
+            'REGISTRO NACIONAL DEL ESTADO CIVIL',
+            'CERTIFICADO DE NACIMIENTO',
+            'PARTIDA DE NACIMIENTO'
+          ],
+          excludeKeywords: [
+            'DIGITAL',
+            'QR',
+            'DIGITALLY SIGNED',
+            'FIRMADO DIGITALMENTE'
+          ],
+          layoutIndicators: [
+            'STAMP',
+            'SELLO',
+            'CIRCULAR STAMP',
+            'HANDWRITTEN'
+          ],
+          confidence: 0.8,
+          language: 'es'
+        }
+      });
+      console.log('✅ Created Birth Certificate Old Format document version');
+    }
+    
+    // Create Birth Certificate New Format version
+    const existingBirthNewVersions = await this.getDocumentVersionsByType(birthDocType.id);
+    const existingBirthNewVersion = existingBirthNewVersions.find(v => v.code === 'new_format');
+    
+    if (!existingBirthNewVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: birthDocType.id,
+        name: 'New Format',
+        code: 'new_format',
+        description: 'Modern digital birth certificate format with QR codes and digital signatures',
+        detectionPatterns: {
+          keywords: [
+            'NATIONAL CIVIL REGISTRY',
+            'DIGITAL CIVIL STATUS REGISTRATION',
+            'BIRTH',
+            'QR',
+            'DIGITALLY SIGNED',
+            'DIGITAL',
+            'FIRMADO DIGITALMENTE'
+          ],
+          excludeKeywords: [],
+          layoutIndicators: [
+            'QR_CODE',
+            'BARCODE',
+            'DIGITAL_SIGNATURE'
+          ],
+          confidence: 0.7,
+          language: 'en'
+        }
+      });
+      console.log('✅ Created Birth Certificate New Format document version');
     }
     
     console.log('✅ Default document types and versions initialized successfully');
