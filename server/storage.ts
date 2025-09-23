@@ -1,4 +1,4 @@
-import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser, type TemplateFieldMappings, getFieldNamesFromMappings } from "@shared/schema";
+import { type Template, type InsertTemplate, type ProcessingJob, type InsertProcessingJob, type User, type InsertUser, type TemplateFieldMappings, type DocumentType, type InsertDocumentType, type DocumentVersion, type InsertDocumentVersion, getFieldNamesFromMappings } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -7,10 +7,23 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // Document type methods
+  createDocumentType(documentType: InsertDocumentType): Promise<DocumentType>;
+  getDocumentType(id: string): Promise<DocumentType | undefined>;
+  getDocumentTypes(): Promise<DocumentType[]>;
+  getDocumentTypeByCode(code: string): Promise<DocumentType | undefined>;
+  
+  // Document version methods
+  createDocumentVersion(documentVersion: InsertDocumentVersion): Promise<DocumentVersion>;
+  getDocumentVersion(id: string): Promise<DocumentVersion | undefined>;
+  getDocumentVersionsByType(documentTypeId: string): Promise<DocumentVersion[]>;
+  detectDocumentVersion(ocrText: string, documentTypeId: string): Promise<DocumentVersion | undefined>;
+  
   // Template methods
   createTemplate(template: InsertTemplate): Promise<Template>;
   getTemplate(id: string): Promise<Template | undefined>;
   getTemplates(): Promise<Template[]>;
+  getTemplatesByVersion(documentVersionId: string): Promise<Template[]>;
   updateTemplate(id: string, updates: Partial<Template>): Promise<Template | undefined>;
   deleteTemplate(id: string): Promise<boolean>;
   
@@ -20,6 +33,9 @@ export interface IStorage {
   getProcessingJobs(): Promise<ProcessingJob[]>;
   updateProcessingJob(id: string, updates: Partial<ProcessingJob>): Promise<ProcessingJob | undefined>;
   deleteProcessingJob(id: string): Promise<boolean>;
+  
+  // Initialization method
+  initializeDefaultData(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
