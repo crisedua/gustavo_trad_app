@@ -42,6 +42,8 @@ export class MemStorage implements IStorage {
   private users: Map<string, User> = new Map();
   private templates: Map<string, Template> = new Map();
   private processingJobs: Map<string, ProcessingJob> = new Map();
+  private documentTypes: Map<string, DocumentType> = new Map();
+  private documentVersions: Map<string, DocumentVersion> = new Map();
 
   constructor() {
     // Add default marriage certificate template with new fieldMappings structure
@@ -297,6 +299,8 @@ export class MemStorage implements IStorage {
       fieldMappings: defaultFieldMappings,
       isAutoCreated: false,
       sourceDocumentPath: null,
+      documentTypeId: null,
+      documentVersionId: null,
       templateType: "marriage_certificate",
       detectionMetadata: {
         detectionMethod: "template_predefined",
@@ -347,6 +351,8 @@ export class MemStorage implements IStorage {
       fieldMappings: insertTemplate.fieldMappings,
       isAutoCreated: insertTemplate.isAutoCreated ?? false,
       sourceDocumentPath: insertTemplate.sourceDocumentPath ?? null,
+      documentTypeId: insertTemplate.documentTypeId ?? null,
+      documentVersionId: insertTemplate.documentVersionId ?? null,
       templateType: insertTemplate.templateType ?? null,
       detectionMetadata: insertTemplate.detectionMetadata ?? null,
       validationRules: insertTemplate.validationRules ?? {},
@@ -378,6 +384,12 @@ export class MemStorage implements IStorage {
     return this.templates.delete(id);
   }
 
+  async getTemplatesByVersion(documentVersionId: string): Promise<Template[]> {
+    return Array.from(this.templates.values()).filter(
+      template => template.documentVersionId === documentVersionId
+    );
+  }
+
   // Processing job methods
   async createProcessingJob(insertJob: InsertProcessingJob): Promise<ProcessingJob> {
     const id = randomUUID();
@@ -387,6 +399,9 @@ export class MemStorage implements IStorage {
       extractedData: insertJob.extractedData ?? {},
       templateId: insertJob.templateId ?? null,
       extractedFieldValues: insertJob.extractedFieldValues ?? {},
+      selectedDocumentTypeId: insertJob.selectedDocumentTypeId ?? null,
+      detectedVersionId: insertJob.detectedVersionId ?? null,
+      versionDetectionResults: insertJob.versionDetectionResults ?? null,
       errorMessage: null,
       generatedDocumentPath: null,
       createdAt: new Date(),
@@ -421,6 +436,190 @@ export class MemStorage implements IStorage {
 
   async deleteProcessingJob(id: string): Promise<boolean> {
     return this.processingJobs.delete(id);
+  }
+
+  // Document type methods
+  async createDocumentType(documentType: InsertDocumentType): Promise<DocumentType> {
+    const id = randomUUID();
+    const type: DocumentType = {
+      ...documentType,
+      id,
+      description: documentType.description ?? null,
+      isActive: documentType.isActive ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.documentTypes.set(id, type);
+    return type;
+  }
+
+  async getDocumentType(id: string): Promise<DocumentType | undefined> {
+    return this.documentTypes.get(id);
+  }
+
+  async getDocumentTypes(): Promise<DocumentType[]> {
+    return Array.from(this.documentTypes.values());
+  }
+
+  async getDocumentTypeByCode(code: string): Promise<DocumentType | undefined> {
+    return Array.from(this.documentTypes.values()).find(dt => dt.code === code);
+  }
+
+  // Document version methods
+  async createDocumentVersion(documentVersion: InsertDocumentVersion): Promise<DocumentVersion> {
+    const id = randomUUID();
+    const version: DocumentVersion = {
+      ...documentVersion,
+      id,
+      description: documentVersion.description ?? null,
+      isActive: documentVersion.isActive ?? null,
+      detectionPatterns: documentVersion.detectionPatterns ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.documentVersions.set(id, version);
+    return version;
+  }
+
+  async getDocumentVersion(id: string): Promise<DocumentVersion | undefined> {
+    return this.documentVersions.get(id);
+  }
+
+  async getDocumentVersionsByType(documentTypeId: string): Promise<DocumentVersion[]> {
+    return Array.from(this.documentVersions.values()).filter(dv => dv.documentTypeId === documentTypeId);
+  }
+
+  async detectDocumentVersion(ocrText: string, documentTypeId: string): Promise<DocumentVersion | undefined> {
+    const versions = await this.getDocumentVersionsByType(documentTypeId);
+    
+    for (const version of versions) {
+      if (!version.detectionPatterns) continue;
+      
+      const patterns = version.detectionPatterns;
+      let score = 0;
+      let totalChecks = 0;
+      
+      // Check keywords
+      if (patterns.keywords) {
+        totalChecks += patterns.keywords.length;
+        for (const keyword of patterns.keywords) {
+          if (ocrText.toLowerCase().includes(keyword.toLowerCase())) {
+            score++;
+          }
+        }
+      }
+      
+      // Check exclude keywords (negative scoring)
+      if (patterns.excludeKeywords) {
+        for (const excludeKeyword of patterns.excludeKeywords) {
+          if (ocrText.toLowerCase().includes(excludeKeyword.toLowerCase())) {
+            score -= 0.5; // Penalty for excluded keywords
+          }
+        }
+      }
+      
+      // Calculate confidence
+      const confidence = totalChecks > 0 ? score / totalChecks : 0;
+      
+      // Return if confidence meets threshold
+      if (confidence >= (patterns.confidence || 0.7)) {
+        return version;
+      }
+    }
+    
+    return undefined;
+  }
+
+  // Initialization method
+  async initializeDefaultData(): Promise<void> {
+    console.log('🚀 Initializing default document types and versions for memory storage...');
+    
+    // Create Marriage Certificate document type
+    let marriageDocType: DocumentType;
+    const existingType = await this.getDocumentTypeByCode('marriage_certificate');
+    
+    if (existingType) {
+      marriageDocType = existingType;
+      console.log('✅ Marriage Certificate document type already exists');
+    } else {
+      marriageDocType = await this.createDocumentType({
+        name: 'Marriage Certificate',
+        code: 'marriage_certificate',
+        description: 'Official marriage certificates from civil registry'
+      });
+      console.log('✅ Created Marriage Certificate document type');
+    }
+    
+    // Create Old Format version
+    const existingOldVersions = await this.getDocumentVersionsByType(marriageDocType.id);
+    const existingOldVersion = existingOldVersions.find(v => v.code === 'old_format');
+    
+    if (!existingOldVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: marriageDocType.id,
+        name: 'Old Format',
+        code: 'old_format',
+        description: 'Traditional handwritten or typewritten format from pre-digital era',
+        detectionPatterns: {
+          keywords: [
+            'REGISTRO DEL ESTADO CIVIL',
+            'REGISTRO CIVIL',
+            'MATRIMONIO',
+            'REGISTRO NACIONAL DEL ESTADO CIVIL',
+            'CERTIFICADO DE MATRIMONIO'
+          ],
+          excludeKeywords: [
+            'DIGITAL',
+            'QR',
+            'DIGITALLY SIGNED',
+            'FIRMADO DIGITALMENTE'
+          ],
+          layoutIndicators: [
+            'STAMP',
+            'SELLO',
+            'CIRCULAR STAMP',
+            'HANDWRITTEN'
+          ],
+          confidence: 0.8,
+          language: 'es'
+        }
+      });
+      console.log('✅ Created Old Format document version');
+    }
+    
+    // Create New Format version
+    const existingNewVersions = await this.getDocumentVersionsByType(marriageDocType.id);
+    const existingNewVersion = existingNewVersions.find(v => v.code === 'new_format');
+    
+    if (!existingNewVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: marriageDocType.id,
+        name: 'New Format',
+        code: 'new_format',
+        description: 'Modern digital format with QR codes and digital signatures',
+        detectionPatterns: {
+          keywords: [
+            'NATIONAL CIVIL REGISTRY',
+            'DIGITAL CIVIL STATUS REGISTRATION',
+            'QR',
+            'DIGITALLY SIGNED',
+            'DIGITAL',
+            'FIRMADO DIGITALMENTE'
+          ],
+          excludeKeywords: [],
+          layoutIndicators: [
+            'QR_CODE',
+            'BARCODE',
+            'DIGITAL_SIGNATURE'
+          ],
+          confidence: 0.7,
+          language: 'en'
+        }
+      });
+      console.log('✅ Created New Format document version');
+    }
+    
+    console.log('✅ Default document types and versions initialized successfully');
   }
 }
 
@@ -460,12 +659,14 @@ async function initializeStorage() {
   // Final fallback to memory storage
   console.log('Using memory storage as fallback');
   storage = new MemStorage();
+  await storage.initializeDefaultData();
 }
 
 // Initialize storage
-initializeStorage().catch((error) => {
+initializeStorage().catch(async (error) => {
   console.error('Storage initialization error:', error);
   storage = new MemStorage();
+  await storage.initializeDefaultData();
 });
 
 export { storage };
