@@ -726,7 +726,7 @@ export default function AdminJobReview() {
                               Processed
                             </Badge>
                           )}
-                          {field.isFromTemplate && !field.isExtracted && (
+                          {field.isFromTemplate && (!field.value || field.value.trim() === '') && (
                             <Badge variant="destructive" className="text-xs px-1 py-0 h-5">
                               Missing
                             </Badge>
