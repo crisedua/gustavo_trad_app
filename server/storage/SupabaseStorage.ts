@@ -48,23 +48,41 @@ export class SupabaseStorage implements IStorage {
 
   // Template methods
   async createTemplate(insertTemplate: InsertTemplate): Promise<Template> {
+    // Debug: Log what we're about to insert to Supabase
+    console.log('🔍 SupabaseStorage.createTemplate - Data to insert:', {
+      name: insertTemplate.name,
+      fieldMappingsType: typeof insertTemplate.fieldMappings,
+      fieldMappingsIsNull: insertTemplate.fieldMappings === null,
+      fieldMappingsIsUndefined: insertTemplate.fieldMappings === undefined,
+      fieldMappingsKeysCount: insertTemplate.fieldMappings ? Object.keys(insertTemplate.fieldMappings).length : 0,
+      sampleFieldMapping: insertTemplate.fieldMappings ? Object.entries(insertTemplate.fieldMappings)[0] : null
+    });
+
+    const insertData = {
+      name: insertTemplate.name,
+      description: insertTemplate.description,
+      file_path: insertTemplate.filePath,
+      is_auto_created: insertTemplate.isAutoCreated,
+      source_document_path: insertTemplate.sourceDocumentPath,
+      document_type_id: insertTemplate.documentTypeId,
+      document_version_id: insertTemplate.documentVersionId,
+      template_type: insertTemplate.templateType,
+      detection_metadata: insertTemplate.detectionMetadata,
+      field_mappings: insertTemplate.fieldMappings,
+      validation_rules: insertTemplate.validationRules,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log('🔍 Final insert data:', {
+      fieldMappingsInInsertData: insertData.field_mappings !== null && insertData.field_mappings !== undefined,
+      fieldMappingsType: typeof insertData.field_mappings,
+      fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
+    });
+
     const { data, error } = await supabase
       .from('templates')
-      .insert({
-        name: insertTemplate.name,
-        description: insertTemplate.description,
-        file_path: insertTemplate.filePath,
-        is_auto_created: insertTemplate.isAutoCreated,
-        source_document_path: insertTemplate.sourceDocumentPath,
-        document_type_id: insertTemplate.documentTypeId,
-        document_version_id: insertTemplate.documentVersionId,
-        template_type: insertTemplate.templateType,
-        detection_metadata: insertTemplate.detectionMetadata,
-        field_mappings: insertTemplate.fieldMappings,
-        validation_rules: insertTemplate.validationRules,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single();
     
