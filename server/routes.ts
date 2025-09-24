@@ -75,6 +75,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Document Types API
+  app.get("/api/document-types", async (req, res) => {
+    try {
+      const documentTypes = await storage.getDocumentTypes();
+      res.json(documentTypes);
+    } catch (error) {
+      console.error("Error fetching document types:", error);
+      res.status(500).json({ error: "Failed to fetch document types" });
+    }
+  });
+
   // Utility function to convert legacy fields array to new fieldMappings structure
   function convertLegacyFieldsToMappings(legacyFields: any[]): any {
     const fieldMappings: any = {};
@@ -885,6 +896,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (job.templateId) {
               selectedTemplate = await storage.getTemplate(job.templateId);
               console.log('🔄 Falling back to manually selected template:', selectedTemplate?.name);
+              
+              // VALIDATION: Check for template mismatch and generate alert
+              if (selectedTemplate && marriageDocType) {
+                const templateDocType = selectedTemplate.documentTypeId;
+                const detectedDocTypeId = marriageDocType.id;
+                
+                // Check if template is linked to a different document type
+                if (templateDocType && templateDocType !== detectedDocTypeId) {
+                  console.log('⚠️ TEMPLATE MISMATCH DETECTED!');
+                  console.log(`   Detected document type: ${marriageDocType.name} (${detectedDocTypeId})`);
+                  console.log(`   Selected template type: ${templateDocType}`);
+                  
+                  // Store mismatch alert in job results
+                  await storage.updateProcessingJob(job.id, {
+                    versionDetectionResults: {
+                      templateMismatchAlert: {
+                        severity: 'warning',
+                        title: 'Template Format Mismatch',
+                        message: `You selected "${selectedTemplate.name}" template, but the uploaded document appears to be a different format. This may result in incorrect field mapping.`,
+                        detectedDocumentType: marriageDocType.name,
+                        selectedTemplateName: selectedTemplate.name,
+                        confidence: 'high',
+                        recommendation: 'Please verify the template selection matches your document format.'
+                      },
+                      ocrText: ocrResult.substring(0, 500),
+                      processingTime: Date.now()
+                    }
+                  });
+                } else if (!templateDocType) {
+                  // Template has no document type set - generate info alert
+                  console.log('ℹ️ Template has no document type specified');
+                  
+                  await storage.updateProcessingJob(job.id, {
+                    versionDetectionResults: {
+                      templateMismatchAlert: {
+                        severity: 'info',
+                        title: 'Template Validation',
+                        message: `The selected template "${selectedTemplate.name}" is not categorized by document type. Please verify it matches your document format.`,
+                        detectedDocumentType: marriageDocType.name,
+                        selectedTemplateName: selectedTemplate.name,
+                        confidence: 'medium',
+                        recommendation: 'Review the template fields to ensure they match your document structure.'
+                      },
+                      ocrText: ocrResult.substring(0, 500),
+                      processingTime: Date.now()
+                    }
+                  });
+                }
+              }
             }
           }
         } else {
@@ -903,6 +963,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (job.templateId) {
           selectedTemplate = await storage.getTemplate(job.templateId);
           console.log('🔄 Using manually selected template:', selectedTemplate?.name);
+          
+          // VALIDATION: Check for template mismatch and generate alert
+          if (selectedTemplate && marriageDocType) {
+            const templateDocType = selectedTemplate.documentTypeId;
+            const detectedDocTypeId = marriageDocType.id;
+            
+            // Check if template is linked to a different document type
+            if (templateDocType && templateDocType !== detectedDocTypeId) {
+              console.log('⚠️ TEMPLATE MISMATCH DETECTED!');
+              console.log(`   Detected document type: ${marriageDocType.name} (${detectedDocTypeId})`);
+              console.log(`   Selected template type: ${templateDocType}`);
+              
+              // Store mismatch alert in job results
+              await storage.updateProcessingJob(job.id, {
+                versionDetectionResults: {
+                  templateMismatchAlert: {
+                    severity: 'warning',
+                    title: 'Template Format Mismatch',
+                    message: `You selected "${selectedTemplate.name}" template, but the uploaded document appears to be a different format. This may result in incorrect field mapping.`,
+                    detectedDocumentType: marriageDocType.name,
+                    selectedTemplateName: selectedTemplate.name,
+                    confidence: 'high',
+                    recommendation: 'Please verify the template selection matches your document format.'
+                  },
+                  ocrText: ocrResult.substring(0, 500),
+                  processingTime: Date.now()
+                }
+              });
+            } else if (!templateDocType) {
+              // Template has no document type set - generate info alert
+              console.log('ℹ️ Template has no document type specified');
+              
+              await storage.updateProcessingJob(job.id, {
+                versionDetectionResults: {
+                  templateMismatchAlert: {
+                    severity: 'info',
+                    title: 'Template Validation',
+                    message: `The selected template "${selectedTemplate.name}" is not categorized by document type. Please verify it matches your document format.`,
+                    detectedDocumentType: marriageDocType.name,
+                    selectedTemplateName: selectedTemplate.name,
+                    confidence: 'medium',
+                    recommendation: 'Review the template fields to ensure they match your document structure.'
+                  },
+                  ocrText: ocrResult.substring(0, 500),
+                  processingTime: Date.now()
+                }
+              });
+            }
+          }
         }
       }
       
