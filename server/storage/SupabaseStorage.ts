@@ -58,21 +58,32 @@ export class SupabaseStorage implements IStorage {
       sampleFieldMapping: insertTemplate.fieldMappings ? Object.entries(insertTemplate.fieldMappings)[0] : null
     });
 
+    // CRITICAL FIX: Ensure JSONB fields are properly serialized and never null
+    const safeFieldMappings = insertTemplate.fieldMappings || {};
+    const safeDetectionMetadata = insertTemplate.detectionMetadata || {};
+    const safeValidationRules = insertTemplate.validationRules || {};
+
     const insertData = {
       name: insertTemplate.name,
       description: insertTemplate.description,
       file_path: insertTemplate.filePath,
-      is_auto_created: insertTemplate.isAutoCreated,
+      is_auto_created: insertTemplate.isAutoCreated || false,
       source_document_path: insertTemplate.sourceDocumentPath,
       document_type_id: insertTemplate.documentTypeId,
       document_version_id: insertTemplate.documentVersionId,
       template_type: insertTemplate.templateType,
-      detection_metadata: insertTemplate.detectionMetadata,
-      field_mappings: insertTemplate.fieldMappings,
-      validation_rules: insertTemplate.validationRules,
+      detection_metadata: safeDetectionMetadata,
+      field_mappings: safeFieldMappings,
+      validation_rules: safeValidationRules,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    // Ensure field_mappings is never null or undefined
+    if (!insertData.field_mappings || Object.keys(insertData.field_mappings).length === 0) {
+      console.warn('⚠️  Field mappings is empty, using minimal structure');
+      insertData.field_mappings = {};
+    }
 
     console.log('🔍 Final insert data:', {
       fieldMappingsInInsertData: insertData.field_mappings !== null && insertData.field_mappings !== undefined,
