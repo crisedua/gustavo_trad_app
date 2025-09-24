@@ -7,6 +7,7 @@ import { OCRService } from "./services/ocrService";
 import { FieldExtractionService } from "./services/fieldExtractionService";
 import { DocumentGenerationService } from "./services/documentGenerationService";
 import { TemplateAnalysisService } from "./services/templateAnalysisService";
+import { TemplateMatchingService } from "./services/templateMatchingService";
 import multer from "multer";
 import * as fs from "fs";
 import * as path from "path";
@@ -21,6 +22,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const fieldExtractionService = new FieldExtractionService();
   const documentGenerationService = new DocumentGenerationService();
   const templateAnalysisService = new TemplateAnalysisService();
+  const templateMatchingService = new TemplateMatchingService();
 
   // Serve public objects (templates, etc.)
   app.get("/public-objects/:filePath(*)", async (req, res) => {
@@ -754,12 +756,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const ocrResult = await ocrService.extractTextFromFile(job.originalFilePath);
       
-      // Update status to version detection
-      await storage.updateProcessingJob(job.id, { status: 'version_detection' });
+      // Update status to intelligent template matching
+      await storage.updateProcessingJob(job.id, { status: 'template_matching' });
 
-      // 🔍 AUTOMATIC DOCUMENT VERSION DETECTION
-      console.log('🔍 Starting automatic document version detection...');
+      // 🧠 INTELLIGENT TEMPLATE MATCHING
+      console.log('🧠 Starting intelligent template matching...');
       let selectedTemplate: any | undefined = undefined;
+      let templateMatchResults: any[] = [];
       
       // For now, assume marriage certificate type (can be extended for other document types)
       const marriageDocType = await storage.getDocumentTypeByCode('marriage_certificate');
@@ -767,50 +770,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (marriageDocType) {
         console.log('📋 Found marriage certificate document type:', marriageDocType.id);
         
-        // Detect the specific version (old vs new format)
-        const detectedVersion = await storage.detectDocumentVersion(ocrResult, marriageDocType.id);
+        // Get all templates for this document type
+        const availableTemplates = await storage.getTemplatesByDocumentType(marriageDocType.id);
+        console.log(`🔍 Found ${availableTemplates.length} available templates for matching`);
         
-        if (detectedVersion) {
-          console.log('✅ Document version detected:', detectedVersion.name, '(' + detectedVersion.code + ')');
+        if (availableTemplates.length > 0) {
+          // First, do a quick OCR field extraction to get field names for matching
+          console.log('🔍 Extracting field names from OCR text for template matching...');
           
-          // Find templates for this version
-          const templatesForVersion = await storage.getTemplatesByVersion(detectedVersion.id);
+          // Use AI to extract basic field structure from OCR text
+          const quickOcrFields = await fieldExtractionService.extractBasicFieldsFromText(ocrResult);
+          console.log('📊 OCR field structure for matching:', Object.keys(quickOcrFields));
           
-          if (templatesForVersion.length > 0) {
-            selectedTemplate = templatesForVersion[0]; // Use first available template
-            console.log('🎯 Selected template:', selectedTemplate.name, '(' + selectedTemplate.id + ')');
+          // Use intelligent template matching to find the best template
+          templateMatchResults = await templateMatchingService.findBestTemplateMatch(
+            quickOcrFields,
+            availableTemplates.map((t: any) => ({ id: t.id, name: t.name, fieldMappings: t.fieldMappings || {} })),
+            0.3 // Minimum score threshold
+          );
+          
+          console.log(`🎯 Template matching results: ${templateMatchResults.length} matches found`);
+          templateMatchResults.forEach((result, index) => {
+            console.log(`  ${index + 1}. ${result.templateName}: ${(result.score * 100).toFixed(1)}% match (${result.confidence} confidence)`);
+            console.log(`     Matched fields: ${Object.keys(result.matchedFields).length}/${Object.keys(quickOcrFields).length}`);
+          });
+          
+          if (templateMatchResults.length > 0 && templateMatchResults[0].confidence !== 'none') {
+            // Use the best matching template
+            const bestMatch = templateMatchResults[0];
+            selectedTemplate = availableTemplates.find((t: any) => t.id === bestMatch.templateId);
             
-            // Update job with detected version and selected template
+            console.log(`✅ Auto-selected template: ${selectedTemplate?.name} (${(bestMatch.score * 100).toFixed(1)}% match)`);
+            
+            // Update job with template matching results and selected template
             await storage.updateProcessingJob(job.id, {
-              detectedVersionId: detectedVersion.id,
               templateId: selectedTemplate.id,
               versionDetectionResults: {
-                detectedVersions: [{
-                  versionId: detectedVersion.id,
-                  versionName: detectedVersion.name,
-                  confidence: detectedVersion.detectionPatterns?.confidence || 0.8,
-                  matchedPatterns: detectedVersion.detectionPatterns?.keywords || [],
-                  reasoning: `Detected based on keywords and layout patterns`
-                }],
-                selectedVersion: {
-                  versionId: detectedVersion.id,
-                  confidence: detectedVersion.detectionPatterns?.confidence || 0.8,
-                  autoSelected: true
+                templateMatchResults: templateMatchResults.map(result => ({
+                  templateId: result.templateId,
+                  templateName: result.templateName,
+                  score: result.score,
+                  confidence: result.confidence,
+                  matchedFieldCount: Object.keys(result.matchedFields).length,
+                  totalOcrFields: Object.keys(quickOcrFields).length,
+                  reasoning: `Intelligent field matching: ${Object.keys(result.matchedFields).join(', ')}`
+                })),
+                selectedTemplate: {
+                  templateId: bestMatch.templateId,
+                  templateName: bestMatch.templateName,
+                  score: bestMatch.score,
+                  confidence: bestMatch.confidence,
+                  autoSelected: true,
+                  matchingMethod: 'intelligent_field_matching'
                 },
                 ocrText: ocrResult.substring(0, 500), // Store first 500 chars
                 processingTime: Date.now()
               }
             });
           } else {
-            console.log('⚠️ No templates found for detected version:', detectedVersion.name);
+            console.log('⚠️ No good template matches found (all scores below threshold or no confidence)');
+            
+            // Fallback to manual template selection if provided
+            if (job.templateId) {
+              selectedTemplate = await storage.getTemplate(job.templateId);
+              console.log('🔄 Falling back to manually selected template:', selectedTemplate?.name);
+            }
           }
         } else {
-          console.log('❌ Could not detect document version automatically');
+          console.log('❌ No templates found for document type');
           
           // Fallback to manual template selection if provided
           if (job.templateId) {
             selectedTemplate = await storage.getTemplate(job.templateId);
-            console.log('🔄 Falling back to manually selected template:', selectedTemplate?.name);
+            console.log('🔄 Using manually selected template:', selectedTemplate?.name);
           }
         }
       } else {
