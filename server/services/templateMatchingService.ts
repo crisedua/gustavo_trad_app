@@ -91,7 +91,146 @@ export class TemplateMatchingService {
     
     // Define mapping rules for common patterns
     const mappingRules: Array<{ ocrPattern: RegExp; templatePatterns: RegExp[]; priority: number }> = [
-      // Names mapping rules
+      // Birth Certificate Specific Rules
+      // Gender/Sex mapping
+      {
+        ocrPattern: /^sex$/i,
+        templatePatterns: [/^sexo$/i, /^sex$/i, /^gender$/i],
+        priority: 15
+      },
+      
+      // Names mapping for birth certificates
+      {
+        ocrPattern: /^first_name$/i,
+        templatePatterns: [/givennames?$/i, /first_names?$/i, /names?$/i, /party_a_names?$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^given_names?$/i,
+        templatePatterns: [/givennames?$/i, /first_names?$/i, /names?$/i],
+        priority: 12
+      },
+      
+      // Surname mappings for birth certificates
+      {
+        ocrPattern: /^last_name$/i,
+        templatePatterns: [/firstsurname$/i, /surnames?$/i, /last_names?$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^surname$/i,
+        templatePatterns: [/firstsurname$/i, /secondsurname$/i, /surnames?$/i],
+        priority: 11
+      },
+      
+      // Parent mappings - Father
+      {
+        ocrPattern: /^father_name$/i,
+        templatePatterns: [/fathersurname$/i, /father.*names?$/i, /paternal.*name$/i],
+        priority: 13
+      },
+      {
+        ocrPattern: /^father_id$/i,
+        templatePatterns: [/fatherid$/i, /father.*id$/i, /paternal.*id$/i],
+        priority: 13
+      },
+      {
+        ocrPattern: /^father_identification$/i,
+        templatePatterns: [/fatherid$/i, /father.*id$/i, /paternal.*id$/i],
+        priority: 13
+      },
+      {
+        ocrPattern: /^father_nationality$/i,
+        templatePatterns: [/fathernationality$/i, /father.*nationality$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^father_profession$/i,
+        templatePatterns: [/fatherprofession$/i, /father.*profession$/i],
+        priority: 12
+      },
+      
+      // Parent mappings - Mother
+      {
+        ocrPattern: /^mother_name$/i,
+        templatePatterns: [/mothernames?$/i, /mothersurnames?$/i, /mother.*names?$/i, /maternal.*name$/i],
+        priority: 13
+      },
+      {
+        ocrPattern: /^mother_id$/i,
+        templatePatterns: [/motheridnumber$/i, /mother.*id$/i, /maternal.*id$/i],
+        priority: 13
+      },
+      {
+        ocrPattern: /^mother_identification$/i,
+        templatePatterns: [/motheridnumber$/i, /mother.*id$/i, /maternal.*id$/i],
+        priority: 13
+      },
+      {
+        ocrPattern: /^mother_nationality$/i,
+        templatePatterns: [/nationalitymother$/i, /mother.*nationality$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^mother_profession$/i,
+        templatePatterns: [/motherprofession$/i, /mother.*profession$/i],
+        priority: 12
+      },
+      
+      // Birth information
+      {
+        ocrPattern: /^birth_date$/i,
+        templatePatterns: [/dateofbirth$/i, /birth.*date$/i, /day$/i, /month$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^birth_time$/i,
+        templatePatterns: [/time$/i, /birth.*time$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^place_of_birth$/i,
+        templatePatterns: [/birthplace$/i, /place.*birth$/i, /birth.*place$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^birth_place$/i,
+        templatePatterns: [/birthplace$/i, /place.*birth$/i, /birth.*place$/i],
+        priority: 12
+      },
+      
+      // Location mappings
+      {
+        ocrPattern: /^location$/i,
+        templatePatterns: [/municipality$/i, /department$/i, /location$/i],
+        priority: 10
+      },
+      {
+        ocrPattern: /^notary_office$/i,
+        templatePatterns: [/type$/i, /office.*type$/i, /notary$/i],
+        priority: 11
+      },
+      
+      // Registration information
+      {
+        ocrPattern: /^registration_date$/i,
+        templatePatterns: [/dateregistered$/i, /registration.*date$/i],
+        priority: 12
+      },
+      {
+        ocrPattern: /^document_number$/i,
+        templatePatterns: [/idbasicpart$/i, /idaddpart$/i, /document.*number$/i, /identification.*number$/i],
+        priority: 11
+      },
+      
+      // Witness information
+      {
+        ocrPattern: /^witness_name$/i,
+        templatePatterns: [/witnessid$/i, /witness2id$/i, /witness.*name$/i],
+        priority: 11
+      },
+      
+      // General Names mapping rules (lower priority than birth certificate specific)
       { 
         ocrPattern: /^first_name$/i, 
         templatePatterns: [/party_a_names?$/i, /first_names?$/i, /names?$/i], 
