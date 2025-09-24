@@ -792,37 +792,65 @@ export default function AdminJobReview() {
 
               {/* Manual Processing Controls */}
               <div className="space-y-3">
-                <Button
-                  onClick={() => processOCRMutation.mutate()}
-                  disabled={processOCRMutation.isPending}
-                  className="w-full"
-                  data-testid="button-process-ocr"
-                >
-                  {processOCRMutation.isPending ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Zap className="h-4 w-4 mr-2" />
-                  )}
-                  {job.status === 'pending_review' ? 'Start OCR & Field Extraction' : 
-                   job.status === 'validation_failed' ? 'Retry with Selected Template' : 
-                   'Re-process OCR & Fields'}
-                </Button>
+                {/* Show validation message in place of processing controls when validation fails */}
+                {job.status === 'validation_failed' ? (
+                  <div className="space-y-4">
+                    <Alert variant="destructive" className="border-red-200">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Template Validation Failed</AlertTitle>
+                      <AlertDescription className="text-sm">
+                        The selected template is not compatible with your document (0.0% compatibility). 
+                        Please select a different template above that better matches your document structure.
+                      </AlertDescription>
+                    </Alert>
+                    <Button
+                      onClick={() => processOCRMutation.mutate()}
+                      disabled={processOCRMutation.isPending || !selectedTemplateId}
+                      className="w-full"
+                      variant="outline"
+                      data-testid="button-retry-validation"
+                    >
+                      {processOCRMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 mr-2" />
+                      )}
+                      Retry with Selected Template
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => processOCRMutation.mutate()}
+                      disabled={processOCRMutation.isPending}
+                      className="w-full"
+                      data-testid="button-process-ocr"
+                    >
+                      {processOCRMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 mr-2" />
+                      )}
+                      {job.status === 'pending_review' ? 'Start OCR & Field Extraction' : 'Re-process OCR & Fields'}
+                    </Button>
 
-                {job.extractedFieldValues && selectedTemplateId && (
-                  <Button
-                    onClick={() => generateDocumentMutation.mutate()}
-                    disabled={generateDocumentMutation.isPending}
-                    className="w-full"
-                    variant="default"
-                    data-testid="button-generate-document"
-                  >
-                    {generateDocumentMutation.isPending ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileCheck className="h-4 w-4 mr-2" />
+                    {job.extractedFieldValues && selectedTemplateId && (
+                      <Button
+                        onClick={() => generateDocumentMutation.mutate()}
+                        disabled={generateDocumentMutation.isPending}
+                        className="w-full"
+                        variant="default"
+                        data-testid="button-generate-document"
+                      >
+                        {generateDocumentMutation.isPending ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileCheck className="h-4 w-4 mr-2" />
+                        )}
+                        Generate Document
+                      </Button>
                     )}
-                    Generate Document
-                  </Button>
+                  </>
                 )}
               </div>
 
