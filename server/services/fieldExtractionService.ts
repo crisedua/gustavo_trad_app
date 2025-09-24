@@ -13,6 +13,76 @@ export interface ExtractedField {
 }
 
 export class FieldExtractionService {
+
+  /**
+   * Extract basic field structure from OCR text for template matching purposes
+   * This is a lightweight extraction to identify field names without full processing
+   */
+  async extractBasicFieldsFromText(ocrText: string): Promise<Record<string, string>> {
+    try {
+      const systemPrompt = `You are extracting field names and values from OCR text of official documents.
+      
+Your task: Identify field names and their corresponding values from the OCR text. Focus on finding structured data like names, numbers, dates, and official document fields.
+
+Return a JSON object where:
+- Keys are field names (lowercase with underscores, e.g., "first_name", "document_number")
+- Values are the extracted values from the text
+
+Example output:
+{
+  "first_name": "JOHN",
+  "last_name": "DOE", 
+  "document_number": "12345",
+  "registry_office": "CIVIL REGISTRY"
+}
+
+Only include fields where you can clearly identify both the field name and its value. If unsure, omit the field.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Extract field names and values from this OCR text:\n\n${ocrText}` }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const extractedFields = JSON.parse(response.choices[0].message.content || '{}');
+      return extractedFields;
+    } catch (error) {
+      console.error('Basic field extraction failed:', error);
+      // Fallback: try to extract some basic patterns manually
+      return this.extractBasicFieldsManually(ocrText);
+    }
+  }
+
+  /**
+   * Manual fallback for basic field extraction
+   */
+  private extractBasicFieldsManually(text: string): Record<string, string> {
+    const fields: Record<string, string> = {};
+    
+    // Common patterns for document fields
+    const patterns = [
+      { pattern: /first_name[:\s]+([A-Z\s]+)/i, field: 'first_name' },
+      { pattern: /other_names?[:\s]+([A-Z\s]+)/i, field: 'other_names' },
+      { pattern: /first_surname[:\s]+([A-Z\s]+)/i, field: 'first_surname' },
+      { pattern: /second_surname[:\s]+([A-Z\s]+)/i, field: 'second_surname' },
+      { pattern: /tax_identification_number[:\s]+([0-9]+)/i, field: 'tax_identification_number' },
+      { pattern: /document_number[:\s]+([A-Z0-9]+)/i, field: 'document_number' },
+      { pattern: /serial[:\s]+([A-Z0-9]+)/i, field: 'serial_indicator' },
+      { pattern: /registry[:\s]+([A-Z\s]+)/i, field: 'registry_office' }
+    ];
+    
+    for (const { pattern, field } of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        fields[field] = match[1].trim();
+      }
+    }
+    
+    return fields;
+  }
   
   /**
    * Extract field names from template - use comprehensive PDF form field detection for ALL templates
