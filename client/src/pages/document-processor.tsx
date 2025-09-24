@@ -252,7 +252,7 @@ export default function DocumentProcessor() {
     const currentIndex = statusSteps.findIndex(s => s.key === currentStatus);
     const stepIndex = statusSteps.findIndex(s => s.key === step.key);
     
-    if (currentStatus === 'error') {
+    if (currentStatus === 'error' || currentStatus === 'validation_failed') {
       return { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100' };
     }
     
