@@ -826,6 +826,101 @@ export class SupabaseStorage implements IStorage {
       });
       console.log('✅ Created New Format document version');
     }
+
+    // Create Birth Certificate document type
+    let birthDocType: DocumentType;
+    const existingBirthType = await this.getDocumentTypeByCode('birth_certificate');
+    
+    if (existingBirthType) {
+      birthDocType = existingBirthType;
+      console.log('✅ Birth Certificate document type already exists');
+    } else {
+      birthDocType = await this.createDocumentType({
+        name: 'Registro Nacimiento',
+        code: 'birth_certificate',
+        description: 'Official birth certificates from civil registry'
+      });
+      console.log('✅ Created Birth Certificate document type');
+    }
+    
+    // Create Birth Certificate Old Format version
+    const { data: existingBirthOldVersion } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('document_type_id', birthDocType.id)
+      .eq('code', 'old_format')
+      .single();
+    
+    if (!existingBirthOldVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: birthDocType.id,
+        name: 'Old Format',
+        code: 'old_format',
+        description: 'Traditional handwritten or typewritten birth certificate format',
+        detectionPatterns: {
+          keywords: [
+            'REGISTRO DEL ESTADO CIVIL',
+            'REGISTRO CIVIL',
+            'NACIMIENTO',
+            'PARTIDA DE NACIMIENTO',
+            'CERTIFICADO DE NACIMIENTO'
+          ],
+          excludeKeywords: [
+            'DIGITAL',
+            'QR',
+            'DIGITALLY SIGNED',
+            'FIRMADO DIGITALMENTE'
+          ],
+          layoutIndicators: [
+            'STAMP',
+            'SELLO',
+            'CIRCULAR STAMP',
+            'HANDWRITTEN'
+          ],
+          confidence: 0.8,
+          language: 'es'
+        }
+      });
+      console.log('✅ Created Birth Certificate Old Format document version');
+    }
+    
+    // Create Birth Certificate New Format version
+    const { data: existingBirthNewVersion } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('document_type_id', birthDocType.id)
+      .eq('code', 'new_format')
+      .single();
+    
+    if (!existingBirthNewVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: birthDocType.id,
+        name: 'New Format',
+        code: 'new_format',
+        description: 'Modern digital birth certificate format with QR codes and digital signatures',
+        detectionPatterns: {
+          keywords: [
+            'REGISTRO DEL ESTADO CIVIL',
+            'REGISTRO CIVIL',
+            'NACIMIENTO',
+            'PARTIDA DE NACIMIENTO',
+            'CERTIFICADO DE NACIMIENTO',
+            'QR',
+            'DIGITAL',
+            'FIRMADO DIGITALMENTE'
+          ],
+          excludeKeywords: [],
+          layoutIndicators: [
+            'QR_CODE',
+            'DIGITAL_SIGNATURE',
+            'BARCODE'
+          ],
+          confidence: 0.9,
+          language: 'es'
+        }
+      });
+      console.log('✅ Created Birth Certificate New Format document version');
+    }
     
     console.log('🎉 Document types and versions initialization complete');
   }
