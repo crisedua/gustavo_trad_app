@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Parse fields if provided as string (legacy format)
       // Convert to new fieldMappings format or provide empty structure
-      let fieldMappings = {};
+      let fieldMappings: any = {};
       let detectionMetadata = {};
       
       if (fields) {
@@ -247,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const analysisResult = await templateAnalysisService.analyzeTemplate(templateFile.path);
           
           // Use the automatically detected field mappings
-          fieldMappings = analysisResult.fieldMappings;
+          fieldMappings = analysisResult.fieldMappings || {};
           detectionMetadata = {
             ...analysisResult.detectionMetadata,
             autoDetected: true,
@@ -263,11 +263,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             processingTime: analysisResult.analysisReport.processingTime
           });
           
+          // Debug: Log fieldMappings structure before database insertion
+          console.log('🔍 Field mappings to be saved:', {
+            fieldMappingsType: typeof fieldMappings,
+            fieldMappingsKeys: Object.keys(fieldMappings || {}),
+            fieldMappingsLength: Object.keys(fieldMappings || {}).length,
+            sampleField: Object.keys(fieldMappings || {})[0] ? fieldMappings[Object.keys(fieldMappings)[0]] : null
+          });
+          
         } catch (analysisError) {
           console.error('Template analysis failed:', analysisError);
           
-          // Don't fail the template creation, just log the error and continue with manual fields
-          console.log('Continuing with manual field mappings due to analysis failure');
+          // Don't fail the template creation, just log the error and continue with empty field mappings
+          console.log('Continuing with empty field mappings due to analysis failure');
+          fieldMappings = {}; // Ensure we have an empty object, not null
           
           // Create basic detection metadata indicating analysis failed
           detectionMetadata = {
@@ -279,7 +288,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
       } else {
-        // Manual field mapping
+        // Manual field mapping - ensure we have empty object
+        fieldMappings = {};
         detectionMetadata = {
           autoDetected: false,
           manualConfiguration: true,
@@ -287,6 +297,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceFilePath: templateFile.path,
           originalFilename: templateFile.originalname
         };
+      }
+
+      // CRITICAL: Ensure fieldMappings is never null before database insertion
+      if (!fieldMappings || typeof fieldMappings !== 'object') {
+        console.warn('⚠️  fieldMappings is null or invalid, using empty object');
+        fieldMappings = {};
       }
 
       // CRITICAL FIX: Move uploaded file to proper storage location
