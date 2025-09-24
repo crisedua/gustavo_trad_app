@@ -103,6 +103,10 @@ export default function AdminJobReview() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Get document type ID from URL parameters as a fallback since database column is temporarily disabled
+  const urlParams = new URLSearchParams(window.location.search);
+  const documentTypeFromUrl = urlParams.get('documentTypeId');
 
   // Fetch specific job details
   const { data: job, isLoading: jobLoading, error: jobError } = useQuery<ProcessingJob>({
@@ -147,10 +151,39 @@ export default function AdminJobReview() {
     }
   }, [job, templates]);
 
+  // Function to detect document type for category-based template selection
+  const getDocumentTypeForProcessing = () => {
+    // Try to get from URL parameters first (if passed from admin interface)
+    if (documentTypeFromUrl) return documentTypeFromUrl;
+    
+    // TEMPORARY: Known document types from the logs - you would replace this with actual logic
+    // For now, detect the document type based on OCR content if available
+    if (job?.extractedData) {
+      const ocrText = Object.values(job.extractedData).join(' ').toLowerCase();
+      
+      // Simple detection based on OCR content
+      if (ocrText.includes('registro civil') || ocrText.includes('nacimiento')) {
+        return '7e216115-54a2-4e19-b1a7-9106ac06eaa6'; // Birth Certificate
+      }
+      if (ocrText.includes('dian') || ocrText.includes('rut')) {
+        return '2d130b0e-77e5-4df4-90a7-b35c0d19cbef'; // DIAN Tax Form  
+      }
+      if (ocrText.includes('marriage') || ocrText.includes('matrimonio')) {
+        return 'fb8c12f5-4bf8-4c23-bc4e-fe5fe6d8ff41'; // Marriage Certificate
+      }
+    }
+    
+    return undefined; // Fallback to automatic detection in backend
+  };
+
   // Manual OCR processing mutation
   const processOCRMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', `/api/processing-jobs/${id}/process`);
+      // Detect and include document type ID in the request body to enable category-based template selection
+      const documentTypeId = getDocumentTypeForProcessing();
+      const requestBody = documentTypeId ? { selectedDocumentTypeId: documentTypeId } : {};
+      console.log('🎯 Processing with document type ID:', documentTypeId);
+      const res = await apiRequest('POST', `/api/processing-jobs/${id}/process`, requestBody);
       return res.json();
     },
     onSuccess: () => {
