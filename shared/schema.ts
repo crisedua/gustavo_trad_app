@@ -60,6 +60,9 @@ export const templates = pgTable("templates", {
     processingTime?: number;
     ocrAccuracy?: number;
   }>(),
+  // FIXED: Move timestamps before JSONB fields to match actual database structure
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   fieldMappings: jsonb("field_mappings").notNull().$type<{
     [fieldName: string]: {
       // Support multiple instances of the same field across different locations
@@ -156,8 +159,6 @@ export const templates = pgTable("templates", {
       }>;
     };
   }>(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const processingJobs = pgTable("processing_jobs", {

@@ -127,95 +127,34 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    // DIRECT FIX: Use explicit column mapping to handle database schema mismatch
-    console.log('🚀 Using explicit column mapping to fix schema issues...');
+    // SCHEMA ALIGNED: Simple insertion now that column order is fixed
+    console.log('🚀 Creating template with aligned schema...');
     
-    try {
-      // Try with all columns explicitly specified in the exact order
-      const { data, error } = await supabase
-        .from('templates')
-        .insert({
-          id: undefined, // Let database generate UUID
-          name: insertData.name,
-          description: insertData.description || null,
-          file_path: insertData.file_path,
-          is_auto_created: insertData.is_auto_created || false,
-          source_document_path: insertData.source_document_path || null,
-          document_type_id: insertData.document_type_id || null,
-          document_version_id: insertData.document_version_id || null,
-          template_type: insertData.template_type || null,
-          detection_metadata: safeDetectionMetadata,
-          field_mappings: safeFieldMappings,
-          validation_rules: safeValidationRules,
-          created_at: undefined, // Let database set timestamp
-          updated_at: undefined  // Let database set timestamp
-        })
-        .select('*')
-        .single();
+    const { data, error } = await supabase
+      .from('templates')
+      .insert({
+        name: insertData.name,
+        description: insertData.description || null,
+        file_path: insertData.file_path,
+        is_auto_created: insertData.is_auto_created || false,
+        source_document_path: insertData.source_document_path || null,
+        document_type_id: insertData.document_type_id || null,
+        document_version_id: insertData.document_version_id || null,
+        template_type: insertData.template_type || null,
+        detection_metadata: safeDetectionMetadata,
+        field_mappings: safeFieldMappings,
+        validation_rules: safeValidationRules
+      })
+      .select('*')
+      .single();
 
-      if (error) {
-        console.log('❌ Full column insert failed, trying minimal approach...');
-        
-        // Try with absolute minimum - just the required fields
-        const { data: minimalData, error: minimalError } = await supabase
-          .from('templates')
-          .insert({
-            name: insertData.name,
-            file_path: insertData.file_path,
-            field_mappings: safeFieldMappings
-          })
-          .select('*')
-          .single();
-          
-        if (minimalError) {
-          console.error('❌ Minimal insert failed:', minimalError);
-          
-          // Emergency: Try creating empty field_mappings first, then update
-          const { data: emptyData, error: emptyError } = await supabase
-            .from('templates')
-            .insert({
-              name: insertData.name,
-              file_path: insertData.file_path,
-              field_mappings: {}  // Empty object
-            })
-            .select('*')
-            .single();
-            
-          if (emptyError) {
-            console.error('❌ Empty template creation failed:', emptyError);
-            throw emptyError;
-          }
-          
-          console.log('✅ Created empty template, now updating with field mappings...');
-          
-          // Now update with actual field mappings
-          const { data: updatedData, error: updateError } = await supabase
-            .from('templates')
-            .update({ field_mappings: safeFieldMappings })
-            .eq('id', emptyData.id)
-            .select('*')
-            .single();
-            
-          if (updateError) {
-            console.error('❌ Field mappings update failed:', updateError);
-            throw updateError;
-          }
-          
-          console.log('✅ Template created with two-step approach:', updatedData.id);
-          return this.mapDbRowToTemplate(updatedData);
-        }
-        
-        console.log('✅ Template created with minimal approach:', minimalData.id);
-        return this.mapDbRowToTemplate(minimalData);
-      }
-
-      console.log('✅ Template created with explicit columns:', data.id);
-      return this.mapDbRowToTemplate(data);
-
-    } catch (insertError) {
-      console.error('❌ All template creation approaches failed:', insertError);
-      throw insertError;
+    if (error) {
+      console.error('❌ Template creation failed:', error);
+      throw error;
     }
+
+    console.log('✅ Template successfully created:', data.id);
+    return this.mapDbRowToTemplate(data);
   }
 
   // Helper method to map database row to Template object
