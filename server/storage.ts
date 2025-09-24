@@ -24,6 +24,7 @@ export interface IStorage {
   getTemplate(id: string): Promise<Template | undefined>;
   getTemplates(): Promise<Template[]>;
   getTemplatesByVersion(documentVersionId: string): Promise<Template[]>;
+  getTemplatesByDocumentType(documentTypeId: string): Promise<Template[]>;
   updateTemplate(id: string, updates: Partial<Template>): Promise<Template | undefined>;
   deleteTemplate(id: string): Promise<boolean>;
   
@@ -387,6 +388,12 @@ export class MemStorage implements IStorage {
   async getTemplatesByVersion(documentVersionId: string): Promise<Template[]> {
     return Array.from(this.templates.values()).filter(
       template => template.documentVersionId === documentVersionId
+    );
+  }
+
+  async getTemplatesByDocumentType(documentTypeId: string): Promise<Template[]> {
+    return Array.from(this.templates.values()).filter(
+      template => template.documentTypeId === documentTypeId
     );
   }
 
