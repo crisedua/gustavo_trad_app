@@ -127,51 +127,30 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    // DIRECT COLUMN FIX: Use exact column names that match database
-    console.log('🚀 Creating template with exact column names...');
+    // FINALIZED: Use camelCase fieldMappings (confirmed working)
+    console.log('🚀 Creating template...');
     
-    // Try with just the three essential columns first to isolate the issue
-    const minimalData = {
-      name: insertData.name,
-      file_path: insertData.file_path,
-      fieldMappings: safeFieldMappings  // Try camelCase
-    };
-    
-    console.log('🔍 Trying camelCase fieldMappings...');
-    
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('templates')
-      .insert(minimalData)
+      .insert({
+        name: insertData.name,
+        description: insertData.description || null,
+        file_path: insertData.file_path,
+        is_auto_created: insertData.is_auto_created || false,
+        source_document_path: insertData.source_document_path || null,
+        document_type_id: insertData.document_type_id || null,
+        document_version_id: insertData.document_version_id || null,
+        template_type: insertData.template_type || null,
+        detection_metadata: safeDetectionMetadata,
+        fieldMappings: safeFieldMappings,  // Use camelCase (confirmed working)
+        validation_rules: safeValidationRules
+      })
       .select('*')
       .single();
 
     if (error) {
-      console.log('❌ camelCase failed, trying snake_case...');
-      
-      // Try snake_case
-      const snakeCaseData = {
-        name: insertData.name,
-        file_path: insertData.file_path,
-        field_mappings: safeFieldMappings  // Try snake_case
-      };
-      
-      const result = await supabase
-        .from('templates')
-        .insert(snakeCaseData)
-        .select('*')
-        .single();
-        
-      data = result.data;
-      error = result.error;
-      
-      if (error) {
-        console.error('❌ Both camelCase and snake_case failed:', error);
-        throw error;
-      }
-      
-      console.log('✅ snake_case field_mappings worked!');
-    } else {
-      console.log('✅ camelCase fieldMappings worked!');
+      console.error('❌ Template creation failed:', error);
+      throw error;
     }
 
     console.log('✅ Template successfully created:', data.id);
@@ -180,6 +159,10 @@ export class SupabaseStorage implements IStorage {
 
   // Helper method to map database row to Template object
   private mapDbRowToTemplate(data: any): Template {
+    // Handle both camelCase and snake_case field mappings
+    const fieldMappings = data.fieldMappings || data.field_mappings || {};
+    const validationRules = data.validationRules || data.validation_rules || {};
+    
     return {
       id: data.id,
       name: data.name,
@@ -191,10 +174,12 @@ export class SupabaseStorage implements IStorage {
       documentVersionId: data.document_version_id,
       templateType: data.template_type,
       detectionMetadata: data.detection_metadata || {},
-      fieldMappings: typeof data.field_mappings === 'string' 
-        ? JSON.parse(data.field_mappings) 
-        : (data.field_mappings || {}),
-      validationRules: data.validation_rules || {},
+      fieldMappings: typeof fieldMappings === 'string' 
+        ? JSON.parse(fieldMappings) 
+        : fieldMappings,
+      validationRules: typeof validationRules === 'string'
+        ? JSON.parse(validationRules)
+        : validationRules,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
@@ -214,23 +199,7 @@ export class SupabaseStorage implements IStorage {
     
     if (!data) return undefined;
     
-    // Map snake_case database columns to camelCase TypeScript properties
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      filePath: data.file_path,
-      isAutoCreated: data.is_auto_created,
-      sourceDocumentPath: data.source_document_path,
-      documentTypeId: data.document_type_id,
-      documentVersionId: data.document_version_id,
-      templateType: data.template_type,
-      detectionMetadata: data.detection_metadata,
-      fieldMappings: data.field_mappings,
-      validationRules: data.validation_rules,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
+    return this.mapDbRowToTemplate(data);
   }
 
   async getTemplates(): Promise<Template[]> {
@@ -246,23 +215,7 @@ export class SupabaseStorage implements IStorage {
     
     if (!data) return [];
     
-    // Map snake_case database columns to camelCase TypeScript properties
-    return data.map(template => ({
-      id: template.id,
-      name: template.name,
-      description: template.description,
-      filePath: template.file_path,
-      isAutoCreated: template.is_auto_created,
-      sourceDocumentPath: template.source_document_path,
-      documentTypeId: template.document_type_id,
-      documentVersionId: template.document_version_id,
-      templateType: template.template_type,
-      detectionMetadata: template.detection_metadata,
-      fieldMappings: template.field_mappings,
-      validationRules: template.validation_rules,
-      createdAt: template.created_at,
-      updatedAt: template.updated_at
-    }));
+    return data.map(template => this.mapDbRowToTemplate(template));
   }
 
   async updateTemplate(id: string, updates: Partial<Template>): Promise<Template | undefined> {
