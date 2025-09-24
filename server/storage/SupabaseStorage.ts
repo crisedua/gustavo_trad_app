@@ -127,30 +127,51 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    // SCHEMA ALIGNED: Simple insertion now that column order is fixed
-    console.log('🚀 Creating template with aligned schema...');
+    // DIRECT COLUMN FIX: Use exact column names that match database
+    console.log('🚀 Creating template with exact column names...');
     
-    const { data, error } = await supabase
+    // Try with just the three essential columns first to isolate the issue
+    const minimalData = {
+      name: insertData.name,
+      file_path: insertData.file_path,
+      fieldMappings: safeFieldMappings  // Try camelCase
+    };
+    
+    console.log('🔍 Trying camelCase fieldMappings...');
+    
+    let { data, error } = await supabase
       .from('templates')
-      .insert({
-        name: insertData.name,
-        description: insertData.description || null,
-        file_path: insertData.file_path,
-        is_auto_created: insertData.is_auto_created || false,
-        source_document_path: insertData.source_document_path || null,
-        document_type_id: insertData.document_type_id || null,
-        document_version_id: insertData.document_version_id || null,
-        template_type: insertData.template_type || null,
-        detection_metadata: safeDetectionMetadata,
-        field_mappings: safeFieldMappings,
-        validation_rules: safeValidationRules
-      })
+      .insert(minimalData)
       .select('*')
       .single();
 
     if (error) {
-      console.error('❌ Template creation failed:', error);
-      throw error;
+      console.log('❌ camelCase failed, trying snake_case...');
+      
+      // Try snake_case
+      const snakeCaseData = {
+        name: insertData.name,
+        file_path: insertData.file_path,
+        field_mappings: safeFieldMappings  // Try snake_case
+      };
+      
+      const result = await supabase
+        .from('templates')
+        .insert(snakeCaseData)
+        .select('*')
+        .single();
+        
+      data = result.data;
+      error = result.error;
+      
+      if (error) {
+        console.error('❌ Both camelCase and snake_case failed:', error);
+        throw error;
+      }
+      
+      console.log('✅ snake_case field_mappings worked!');
+    } else {
+      console.log('✅ camelCase fieldMappings worked!');
     }
 
     console.log('✅ Template successfully created:', data.id);
