@@ -241,6 +241,38 @@ export default function AdminJobReview() {
     return template?.fieldMappings || {};
   };
 
+  // Get comprehensive field list from template + extracted values
+  const getComprehensiveFieldList = () => {
+    const templateFieldMappings = getTemplateFieldMappings();
+    const templateFieldNames = Object.keys(templateFieldMappings);
+    const extractedFieldNames = Object.keys(editableFields || {});
+    
+    // Combine all field names and remove duplicates
+    const allFieldNames = Array.from(new Set([...templateFieldNames, ...extractedFieldNames]));
+    
+    // Create comprehensive field data
+    return allFieldNames.map(fieldName => {
+      const fieldMapping = templateFieldMappings[fieldName];
+      const extractedValue = editableFields?.[fieldName] || '';
+      const fieldDefinition = fieldMapping?.fieldDefinition;
+      
+      return {
+        name: fieldName,
+        value: extractedValue,
+        label: fieldDefinition?.label || fieldName,
+        type: fieldDefinition?.type || 'text',
+        description: fieldDefinition?.description,
+        isFromTemplate: !!fieldMapping,
+        isExtracted: extractedFieldNames.includes(fieldName)
+      };
+    }).sort((a, b) => {
+      // Sort by: template fields first, then extracted-only fields
+      if (a.isFromTemplate && !b.isFromTemplate) return -1;
+      if (!a.isFromTemplate && b.isFromTemplate) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+
   // Render status badge
   const StatusBadge = ({ status }: { status: string }) => {
     const Icon = statusIcons[status as keyof typeof statusIcons] || AlertCircle;
@@ -549,13 +581,13 @@ export default function AdminJobReview() {
           </Card>
         )}
 
-        {/* Extracted Field Values */}
+        {/* Template Fields & Extracted Values */}
         <Card className="mt-6 bg-white dark:bg-gray-800" data-testid="card-field-values">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                Extracted Field Values
+                Template Fields & Extracted Values
               </div>
               <div className="flex items-center gap-2">
                 {isEditingFields ? (
@@ -597,51 +629,70 @@ export default function AdminJobReview() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {editableFields && Object.keys(editableFields).length > 0 ? (
+            {selectedTemplateId ? (
               <div className="space-y-4">
-                {Object.entries(editableFields).map(([fieldName, value]) => (
-                  <div key={fieldName} className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {fieldName}
-                    </Label>
-                    {isEditingFields ? (
-                      <Input
-                        value={value || ''}
-                        onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                        placeholder={`Enter ${fieldName}`}
-                        data-testid={`input-field-${fieldName}`}
-                      />
-                    ) : (
-                      <p className="text-sm text-gray-900 dark:text-gray-100 p-2 bg-gray-50 dark:bg-gray-700 rounded" data-testid={`text-field-${fieldName}`}>
-                        {value || <span className="text-gray-500 italic">No value extracted</span>}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : selectedTemplateId && templates.find(t => t.id === selectedTemplateId) ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No field values extracted yet. Click "Start OCR & Field Extraction" to process this document.
-                </p>
-                {/* Show expected fields from template */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Expected Fields from Template:</Label>
-                  <div className="mt-2 space-y-1">
-                    {Object.entries(getTemplateFieldMappings()).map(([fieldName, fieldMapping]: [string, any]) => (
-                      <div key={fieldName} className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded">
-                        <span className="font-medium">{fieldMapping.fieldDefinition?.label || fieldName}</span>
-                        {fieldMapping.fieldDefinition?.description && (
-                          <span className="ml-2 text-gray-500">- {fieldMapping.fieldDefinition.description}</span>
-                        )}
+                {getComprehensiveFieldList().length > 0 ? (
+                  getComprehensiveFieldList().map((field) => (
+                    <div key={field.name} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {field.label}
+                        </Label>
+                        <div className="flex gap-1">
+                          {field.isFromTemplate && (
+                            <Badge variant="outline" className="text-xs px-1 py-0 h-5">
+                              Template
+                            </Badge>
+                          )}
+                          {field.isExtracted && (
+                            <Badge variant="default" className="text-xs px-1 py-0 h-5 bg-green-100 text-green-800">
+                              Extracted
+                            </Badge>
+                          )}
+                          {!field.isExtracted && field.isFromTemplate && (
+                            <Badge variant="destructive" className="text-xs px-1 py-0 h-5">
+                              Missing
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      {field.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
+                      )}
+                      {isEditingFields ? (
+                        field.type === 'multiline_text' ? (
+                          <Textarea
+                            value={field.value || ''}
+                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                            placeholder={`Enter ${field.label}`}
+                            data-testid={`input-field-${field.name}`}
+                            rows={3}
+                          />
+                        ) : (
+                          <Input
+                            value={field.value || ''}
+                            onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                            placeholder={`Enter ${field.label}`}
+                            data-testid={`input-field-${field.name}`}
+                            type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'}
+                          />
+                        )
+                      ) : (
+                        <p className="text-sm text-gray-900 dark:text-gray-100 p-2 bg-gray-50 dark:bg-gray-700 rounded" data-testid={`text-field-${field.name}`}>
+                          {field.value || <span className="text-gray-500 italic">No value {field.isFromTemplate ? 'extracted' : 'provided'}</span>}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No fields defined in the selected template.
+                  </p>
+                )}
               </div>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Please select a template first to see extractable fields.
+                Please select a template first to see available fields.
               </p>
             )}
           </CardContent>
