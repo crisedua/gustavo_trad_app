@@ -112,19 +112,35 @@ export default function AdminJobReview() {
 
   // Initialize editable fields when job data is loaded
   useEffect(() => {
-    // Merge extractedFieldValues and extractedData to get all available field values
+    if (!job) return;
+    
+    // Get template field mappings
+    const template = templates.find(t => t.id === job.templateId);
+    const templateFieldMappings = template?.fieldMappings || {};
+    
+    // Start with extracted data
+    const ocrFields = job.extractedData || {};
+    const processedFields = job.extractedFieldValues || {};
+    
+    // Create intelligent field mapping from OCR to template
+    const mappedTemplateFields = createFieldMapping(ocrFields, templateFieldMappings);
+    
+    // Merge all field sources
     const mergedFields = {
-      ...(job?.extractedData || {}),
-      ...(job?.extractedFieldValues || {}), // extractedFieldValues takes precedence
+      ...ocrFields,           // Original OCR fields
+      ...processedFields,     // Processed fields
+      ...mappedTemplateFields // Mapped template fields
     };
+    
+    // Successfully mapped OCR fields to template fields
     
     if (Object.keys(mergedFields).length > 0) {
       setEditableFields(mergedFields);
     }
-    if (job?.templateId) {
+    if (job.templateId) {
       setSelectedTemplateId(job.templateId);
     }
-  }, [job]);
+  }, [job, templates]);
 
   // Manual OCR processing mutation
   const processOCRMutation = useMutation({
@@ -247,6 +263,36 @@ export default function AdminJobReview() {
     return template?.fieldMappings || {};
   };
 
+  // Create intelligent field mapping between OCR fields and template fields
+  const createFieldMapping = (ocrFields: Record<string, string>, templateFields: Record<string, any>) => {
+    const mappingRules: Record<string, string> = {
+      // OCR field name -> Template field name
+      'first_name': 'party_a_names',
+      'other_names': 'party_a_names', // Could be combined or separate
+      'first_surname': 'party_a_surnames',
+      'second_surname': 'party_a_surnames',
+      'tax_identification_number': 'party_a_document_number',
+      'nit': 'party_a_document_number',
+    };
+    
+    const mappedFields: Record<string, string> = {};
+    
+    // Apply mapping rules
+    Object.entries(ocrFields).forEach(([ocrFieldName, value]) => {
+      const templateFieldName = mappingRules[ocrFieldName];
+      if (templateFieldName && templateFields[templateFieldName]) {
+        // If template field already has a value, combine them with proper spacing
+        if (mappedFields[templateFieldName]) {
+          mappedFields[templateFieldName] = `${mappedFields[templateFieldName]} ${value}`.trim();
+        } else {
+          mappedFields[templateFieldName] = value;
+        }
+      }
+    });
+    
+    return mappedFields;
+  };
+
   // Get comprehensive field list from template + extracted values
   const getComprehensiveFieldList = () => {
     const templateFieldMappings = getTemplateFieldMappings();
@@ -276,7 +322,7 @@ export default function AdminJobReview() {
       const isFromOCR = ocrExtractedFieldNames.includes(fieldName);
       const isFromProcessed = processedFieldNames.includes(fieldName);
       
-      return {
+      const field = {
         name: fieldName,
         value: extractedValue,
         label: fieldDefinition?.label || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -287,6 +333,8 @@ export default function AdminJobReview() {
         isFromOCR,
         isFromProcessed
       };
+      
+      return field;
     }).sort((a, b) => {
       // Sort by: template fields first, then OCR extracted fields, then others
       if (a.isFromTemplate && !b.isFromTemplate) return -1;
