@@ -8,7 +8,7 @@ import { useState } from "react";
 
 export default function Home() {
   const [adminPassword, setAdminPassword] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(true); // Disabled password requirement
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   
   const ADMIN_PASSWORD = 'admin123'; // In production, this should be environment variable
