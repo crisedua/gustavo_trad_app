@@ -1043,4 +1043,35 @@ export class SupabaseStorage implements IStorage {
       updatedAt: template.updated_at
     }));
   }
+
+  async getTemplatesByDocumentType(documentTypeId: string): Promise<Template[]> {
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('document_type_id', documentTypeId);
+    
+    if (error) {
+      console.error('Error fetching templates by document type:', error);
+      return [];
+    }
+    
+    if (!data) return [];
+    
+    return data.map(template => ({
+      id: template.id,
+      name: template.name,
+      description: template.description,
+      filePath: template.file_path,
+      isAutoCreated: template.is_auto_created,
+      sourceDocumentPath: template.source_document_path,
+      documentTypeId: template.document_type_id,
+      documentVersionId: template.document_version_id,
+      templateType: template.template_type,
+      detectionMetadata: template.detection_metadata,
+      fieldMappings: template.field_mappings,
+      validationRules: template.validation_rules,
+      createdAt: template.created_at,
+      updatedAt: template.updated_at
+    }));
+  }
 }
