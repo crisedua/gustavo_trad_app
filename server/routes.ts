@@ -917,26 +917,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const compatibilityScore = templateFields.length > 0 ? matchingFields / templateFields.length : 0;
                 console.log(`🎯 Template compatibility: ${matchingFields}/${templateFields.length} fields (${(compatibilityScore * 100).toFixed(1)}%)`);
                 
-                // Generate validation alert if compatibility is low
+                // 🛑 ENFORCE VALIDATION: Stop processing if compatibility is too low
                 if (compatibilityScore < 0.3 && templateFields.length > 0) {
-                  console.log('⚠️ LOW COMPATIBILITY: Selected template may not match document structure');
+                  console.log('🛑 VALIDATION FAILED: Stopping processing due to low template compatibility');
                   
                   await storage.updateProcessingJob(job.id, {
+                    status: 'validation_failed',
                     versionDetectionResults: {
                       templateMismatchAlert: {
-                        severity: 'warning',
-                        title: 'Template Compatibility Warning',
-                        message: `The selected template "${selectedTemplate.name}" has low compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the detected document structure. This may result in incorrect field mapping.`,
+                        severity: 'error',
+                        title: 'Template Validation Failed',
+                        message: `Processing stopped: The selected template "${selectedTemplate.name}" has very low compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the detected document structure. This would result in incorrect field mapping.`,
                         detectedFieldCount: ocrFields.length,
                         templateFieldCount: templateFields.length,
                         matchingFieldCount: matchingFields,
                         selectedTemplateName: selectedTemplate.name,
-                        confidence: 'medium',
-                        recommendation: 'Consider selecting a template that better matches the document fields or create a new template for this document format.'
+                        confidence: 'high',
+                        recommendation: 'Please select a different template that better matches your document format, or create a new template for this document type.'
                       },
                       ocrText: ocrResult.substring(0, 500),
                       processingTime: Date.now()
                     }
+                  });
+                  
+                  // 🛑 STOP PROCESSING - Return error response to prevent field extraction
+                  return res.status(400).json({ 
+                    error: "Template validation failed", 
+                    details: `Selected template "${selectedTemplate.name}" has only ${(compatibilityScore * 100).toFixed(1)}% compatibility with the document structure.`,
+                    compatibilityScore: compatibilityScore,
+                    recommendation: "Please select a more compatible template"
                   });
                 } else if (compatibilityScore >= 0.3 && compatibilityScore < 0.7) {
                   console.log('ℹ️ MODERATE COMPATIBILITY: Template partially matches document structure');
@@ -1002,26 +1011,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const compatibilityScore = templateFields.length > 0 ? matchingFields / templateFields.length : 0;
             console.log(`🎯 Manual template compatibility: ${matchingFields}/${templateFields.length} fields (${(compatibilityScore * 100).toFixed(1)}%)`);
             
-            // Generate validation alert for manual selection if compatibility is low
+            // 🛑 ENFORCE VALIDATION: Stop processing if manually selected template has low compatibility
             if (compatibilityScore < 0.3 && templateFields.length > 0) {
-              console.log('⚠️ LOW COMPATIBILITY: Manually selected template may not match document');
+              console.log('🛑 VALIDATION FAILED: Stopping processing due to low manually selected template compatibility');
               
               await storage.updateProcessingJob(job.id, {
+                status: 'validation_failed',
                 versionDetectionResults: {
                   templateMismatchAlert: {
-                    severity: 'warning',
-                    title: 'Template Compatibility Warning',
-                    message: `The manually selected template "${selectedTemplate.name}" has low compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the detected document structure. This may result in incorrect field mapping.`,
+                    severity: 'error',
+                    title: 'Manual Template Validation Failed',
+                    message: `Processing stopped: The manually selected template "${selectedTemplate.name}" has very low compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the detected document structure. This would result in incorrect field mapping.`,
                     detectedFieldCount: ocrFields.length,
                     templateFieldCount: templateFields.length,
                     matchingFieldCount: matchingFields,
                     selectedTemplateName: selectedTemplate.name,
                     confidence: 'high',
-                    recommendation: 'Consider selecting a different template that better matches the document fields.'
+                    recommendation: 'Please select a different template that better matches your document format, or create a new template for this document type.'
                   },
                   ocrText: ocrResult.substring(0, 500),
                   processingTime: Date.now()
                 }
+              });
+              
+              // 🛑 STOP PROCESSING - Return error response to prevent field extraction
+              return res.status(400).json({ 
+                error: "Manual template validation failed", 
+                details: `Manually selected template "${selectedTemplate.name}" has only ${(compatibilityScore * 100).toFixed(1)}% compatibility with the document structure.`,
+                compatibilityScore: compatibilityScore,
+                recommendation: "Please select a more compatible template"
               });
             }
           }
