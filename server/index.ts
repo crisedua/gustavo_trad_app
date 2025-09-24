@@ -36,36 +36,133 @@ app.use((req, res, next) => {
   next();
 });
 
+// Enhanced startup with proper error handling for Autoscale deployments
 (async () => {
-  const server = await registerRoutes(app);
+  try {
+    // Initialize server with error handling
+    const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // Enhanced error handling middleware
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+      // Log error for debugging but don't throw to prevent crash
+      console.error('Server error:', err);
+      res.status(status).json({ message });
+    });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    // Setup Vite or static serving with error handling
+    try {
+      if (app.get("env") === "development") {
+        await setupVite(app, server);
+        log("Vite development server initialized");
+      } else {
+        serveStatic(app);
+        log("Static file serving initialized");
+      }
+    } catch (setupError) {
+      console.error('Failed to setup Vite/static serving:', setupError);
+      throw setupError;
+    }
+
+    // Enhanced PORT handling for Autoscale deployments
+    const port = process.env.PORT 
+      ? parseInt(process.env.PORT, 10)
+      : process.env.REPL_SLUG 
+        ? 5000  // Replit default
+        : 3000; // Local development fallback
+
+    // Validate port
+    if (isNaN(port) || port < 1 || port > 65535) {
+      throw new Error(`Invalid port: ${port}. PORT environment variable must be a valid port number.`);
+    }
+
+    // Start server with comprehensive error handling
+    const serverInstance = server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      log(`Server successfully started on port ${port}`);
+      log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      log(`Host: 0.0.0.0:${port}`);
+    });
+
+    // Handle server startup errors
+    serverInstance.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Trying alternative ports...`);
+        
+        // Try alternative ports for development
+        if (app.get("env") === "development") {
+          const altPorts = [5001, 5002, 3001, 3002];
+          tryAlternativePort(server, altPorts, 0);
+        } else {
+          console.error('Port collision in production environment. Cannot start server.');
+          process.exit(1);
+        }
+      } else {
+        console.error('Server startup error:', error);
+        process.exit(1);
+      }
+    });
+
+    // Graceful shutdown handling
+    process.on('SIGTERM', () => {
+      log('SIGTERM received, shutting down gracefully...');
+      serverInstance.close(() => {
+        log('Server closed successfully');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      log('SIGINT received, shutting down gracefully...');
+      serverInstance.close(() => {
+        log('Server closed successfully');
+        process.exit(0);
+      });
+    });
+
+  } catch (startupError) {
+    console.error('Critical startup error:', startupError);
+    console.error('Stack trace:', startupError instanceof Error ? startupError.stack : 'No stack trace available');
+    
+    // Provide helpful error context
+    console.error('Environment variables:');
+    console.error(`  NODE_ENV: ${process.env.NODE_ENV}`);
+    console.error(`  PORT: ${process.env.PORT}`);
+    console.error(`  REPL_SLUG: ${process.env.REPL_SLUG}`);
+    
+    process.exit(1);
+  }
+})();
+
+// Helper function to try alternative ports in development
+function tryAlternativePort(server: any, ports: number[], index: number) {
+  if (index >= ports.length) {
+    console.error('No available ports found. Please free up a port or set a custom PORT environment variable.');
+    process.exit(1);
+    return;
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
+  const port = ports[index];
+  const serverInstance = server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`Server started on alternative port ${port}`);
   });
-})();
+
+  serverInstance.on('error', (error: any) => {
+    if (error.code === 'EADDRINUSE') {
+      log(`Port ${port} also in use, trying next...`);
+      tryAlternativePort(server, ports, index + 1);
+    } else {
+      console.error('Server error on alternative port:', error);
+      process.exit(1);
+    }
+  });
+}
