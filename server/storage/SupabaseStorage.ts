@@ -229,6 +229,7 @@ export class SupabaseStorage implements IStorage {
     if (updates.filePath !== undefined) dbUpdates.file_path = updates.filePath;
     if (updates.isAutoCreated !== undefined) dbUpdates.is_auto_created = updates.isAutoCreated;
     if (updates.sourceDocumentPath !== undefined) dbUpdates.source_document_path = updates.sourceDocumentPath;
+    if (updates.documentTypeId !== undefined) dbUpdates.document_type_id = updates.documentTypeId;
     if (updates.templateType !== undefined) dbUpdates.template_type = updates.templateType;
     if (updates.detectionMetadata !== undefined) dbUpdates.detection_metadata = updates.detectionMetadata;
     if (updates.fieldMappings !== undefined) {
