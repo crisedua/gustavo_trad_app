@@ -328,6 +328,27 @@ export default function AdminJobReview() {
     const versionDetectionResults = (job as any)?.versionDetectionResults;
     if (!versionDetectionResults) return null;
 
+    // Check for template mismatch alerts first
+    if (versionDetectionResults.templateMismatchAlert) {
+      const alert = versionDetectionResults.templateMismatchAlert;
+      const isWarning = alert.severity === 'warning';
+      
+      return (
+        <Alert variant={isWarning ? "destructive" : "default"} className="mb-4" data-testid="alert-template-mismatch">
+          {isWarning ? <AlertTriangle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+          <AlertTitle>{alert.title}</AlertTitle>
+          <AlertDescription>
+            <p className="mb-2">{alert.message}</p>
+            <div className="text-sm space-y-1">
+              <p><strong>Detected:</strong> {alert.detectedDocumentType}</p>
+              <p><strong>Selected Template:</strong> {alert.selectedTemplateName}</p>
+              <p><strong>Recommendation:</strong> {alert.recommendation}</p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
     // Check if this is the new intelligent template matching results
     if (versionDetectionResults.templateMatchResults) {
       const { templateMatchResults, selectedTemplate } = versionDetectionResults;
