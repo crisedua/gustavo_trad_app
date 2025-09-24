@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +22,8 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle, 
+  AlertTriangle,
+  Info,
   Calendar,
   User,
   Settings,
@@ -291,6 +293,70 @@ export default function AdminJobReview() {
     });
     
     return mappedFields;
+  };
+
+  // Render template matching alerts
+  const renderTemplateMatchingAlerts = () => {
+    const versionDetectionResults = (job as any)?.versionDetectionResults;
+    if (!versionDetectionResults) return null;
+
+    // Check if this is the new intelligent template matching results
+    if (versionDetectionResults.templateMatchResults) {
+      const { templateMatchResults, selectedTemplate } = versionDetectionResults;
+      
+      if (!selectedTemplate || selectedTemplate.confidence === 'none') {
+        return (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>No Good Template Match Found</AlertTitle>
+            <AlertDescription>
+              The system could not find a suitable template that matches the OCR extracted fields. 
+              {templateMatchResults && templateMatchResults.length > 0 ? (
+                <div className="mt-2">
+                  <p>Template matching results:</p>
+                  <ul className="list-disc list-inside mt-1">
+                    {templateMatchResults.slice(0, 3).map((result: any, index: number) => (
+                      <li key={index} className="text-sm">
+                        {result.templateName}: {(result.score * 100).toFixed(1)}% match ({result.confidence} confidence)
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-sm font-medium">Please manually select an appropriate template or create a new one.</p>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm">Please manually select a template from the dropdown above.</p>
+              )}
+            </AlertDescription>
+          </Alert>
+        );
+      } else if (selectedTemplate.confidence === 'low') {
+        return (
+          <Alert variant="default" className="mb-4 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Low Confidence Template Match</AlertTitle>
+            <AlertDescription>
+              The system selected "{selectedTemplate.templateName}" with {(selectedTemplate.score * 100).toFixed(1)}% confidence. 
+              Please review the field mappings below and verify they are correct.
+            </AlertDescription>
+          </Alert>
+        );
+      } else if (selectedTemplate.confidence === 'high') {
+        return (
+          <Alert variant="default" className="mb-4 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle>High Confidence Template Match</AlertTitle>
+            <AlertDescription>
+              Successfully matched template "{selectedTemplate.templateName}" with {(selectedTemplate.score * 100).toFixed(1)}% confidence.
+              {templateMatchResults && templateMatchResults.length > 1 && (
+                <span className="ml-2 text-sm">({templateMatchResults.length} templates evaluated)</span>
+              )}
+            </AlertDescription>
+          </Alert>
+        );
+      }
+    }
+    
+    return null;
   };
 
   // Get comprehensive field list from template + extracted values
@@ -652,6 +718,9 @@ export default function AdminJobReview() {
             </CardContent>
           </Card>
         )}
+
+        {/* Template Matching Alerts */}
+        {renderTemplateMatchingAlerts()}
 
         {/* Template Fields & Extracted Values */}
         <Card className="mt-6 bg-white dark:bg-gray-800" data-testid="card-field-values">
