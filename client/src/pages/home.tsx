@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileText, Settings, Upload, Zap, Lock, Shield, UserCheck } from "lucide-react";
+import { FileText, Settings, Upload, Zap, Lock, Shield, UserCheck, Folder } from "lucide-react";
 import { useState } from "react";
 
 export default function Home() {
@@ -179,6 +179,12 @@ export default function Home() {
                   <Button variant="outline" size="lg" className="w-full sm:w-auto" data-testid="button-admin-requests">
                     <Settings className="w-5 h-5 mr-2" />
                     Admin Requests
+                  </Button>
+                </Link>
+                <Link href="/admin/categories">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto" data-testid="button-category-admin">
+                    <Folder className="w-5 h-5 mr-2" />
+                    Category Admin
                   </Button>
                 </Link>
                 <Link href="/admin/templates">

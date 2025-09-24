@@ -124,6 +124,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assign templates to document type
+  app.post("/api/document-types/:categoryId/templates", async (req, res) => {
+    try {
+      const { categoryId } = req.params;
+      const { templateIds } = req.body;
+
+      if (!templateIds || !Array.isArray(templateIds)) {
+        return res.status(400).json({ error: "templateIds array is required" });
+      }
+
+      // Check if document type exists
+      const documentTypes = await storage.getDocumentTypes();
+      const documentType = documentTypes.find((dt: any) => dt.id === categoryId);
+      if (!documentType) {
+        return res.status(404).json({ error: "Document type not found" });
+      }
+
+      // Validate that all templates exist
+      const allTemplates = await storage.getTemplates();
+      const templateMap = new Map(allTemplates.map((t: any) => [t.id, t]));
+      
+      for (const templateId of templateIds) {
+        if (!templateMap.has(templateId)) {
+          return res.status(404).json({ error: `Template ${templateId} not found` });
+        }
+      }
+
+      // Assign templates to the document type
+      const results = [];
+      for (const templateId of templateIds) {
+        const updatedTemplate = await storage.updateTemplate(templateId, {
+          documentTypeId: categoryId
+        });
+        if (updatedTemplate) {
+          results.push(updatedTemplate);
+        }
+      }
+
+      res.json({
+        success: true,
+        assignedTemplates: results.length,
+        documentType: documentType,
+        templateIds: templateIds
+      });
+    } catch (error) {
+      console.error("Error assigning templates to document type:", error);
+      res.status(500).json({ error: "Failed to assign templates to document type" });
+    }
+  });
+
   // Utility function to convert legacy fields array to new fieldMappings structure
   function convertLegacyFieldsToMappings(legacyFields: any[]): any {
     const fieldMappings: any = {};
