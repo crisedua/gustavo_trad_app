@@ -56,7 +56,7 @@ const statusSteps = [
 
 export default function DocumentProcessor() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; status: string }>>([]);
   const [showAllFields, setShowAllFields] = useState(false);
@@ -64,7 +64,12 @@ export default function DocumentProcessor() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch templates
+  // Fetch document types instead of templates
+  const { data: documentTypes = [], isLoading: documentTypesLoading } = useQuery<{ id: string; name: string; description: string; }[]>({
+    queryKey: ['/api/document-types'],
+  });
+
+  // Keep this for backwards compatibility with admin interface
   const { data: templates = [], isLoading: templatesLoading } = useQuery<Template[]>({
     queryKey: ['/api/templates'],
   });
@@ -85,11 +90,11 @@ export default function DocumentProcessor() {
 
   // Current job
   const currentJob = currentJobId ? processingJobs.find(job => job.id === currentJobId) : null;
-  const selectedTemplate = selectedTemplateId ? templates.find(t => t.id === selectedTemplateId) : null;
+  const selectedDocumentType = selectedDocumentTypeId ? documentTypes.find(dt => dt.id === selectedDocumentTypeId) : null;
 
   // Create processing job mutation
   const createJobMutation = useMutation({
-    mutationFn: async (data: { originalFilePath: string; userEmail: string; templateId?: string }) => {
+    mutationFn: async (data: { originalFilePath: string; userEmail: string; selectedDocumentTypeId?: string }) => {
       const res = await apiRequest('POST', '/api/processing-jobs', data);
       return res.json();
     },
@@ -176,23 +181,23 @@ export default function DocumentProcessor() {
       // Get current state values at upload time (avoid stale closures)
       // Use a small timeout to ensure DOM updates and state changes have been processed  
       setTimeout(() => {
-        // Get current template selection from DOM to avoid stale closures
-        const templateSelect = document.getElementById('template-select') as HTMLSelectElement;
-        const currentSelectedTemplateIdFresh = templateSelect?.value || selectedTemplateId;
+        // Get current document type selection from DOM to avoid stale closures
+        const documentTypeSelect = document.getElementById('document-type-select') as HTMLSelectElement;
+        const currentSelectedDocumentTypeIdFresh = documentTypeSelect?.value || selectedDocumentTypeId;
         
         // Get current email value from the DOM as backup to ensure we have the latest value
         const emailInput = document.getElementById('user-email') as HTMLInputElement;
         const currentUserEmail = emailInput?.value || userEmail;
         
-        console.log('Upload validation check - template from DOM:', templateSelect?.value, 'template from state:', selectedTemplateId, 'email from DOM:', emailInput?.value, 'templates count:', templates.length);
+        console.log('Upload validation check - document type from DOM:', documentTypeSelect?.value, 'document type from state:', selectedDocumentTypeId, 'email from DOM:', emailInput?.value, 'document types count:', documentTypes.length);
         
-        if (!currentSelectedTemplateIdFresh || currentSelectedTemplateIdFresh === '') {
+        if (!currentSelectedDocumentTypeIdFresh || currentSelectedDocumentTypeIdFresh === '') {
           toast({
             title: "Error",
-            description: "Please select a template before uploading a document.",
+            description: "Please select a document type before uploading a document.",
             variant: "destructive",
           });
-          console.error('Processing job creation aborted: No template selected');
+          console.error('Processing job creation aborted: No document type selected');
           return;
         }
 
@@ -218,17 +223,17 @@ export default function DocumentProcessor() {
           return;
         }
 
-        console.log('Creating processing job with templateId:', currentSelectedTemplateIdFresh, 'email:', currentUserEmail);
+        console.log('Creating processing job with documentTypeId:', currentSelectedDocumentTypeIdFresh, 'email:', currentUserEmail);
         
         // Start processing
         createJobMutation.mutate({
           originalFilePath: uploadedFile.uploadURL || '',
           userEmail: currentUserEmail.trim(),
-          templateId: currentSelectedTemplateIdFresh
+          selectedDocumentTypeId: currentSelectedDocumentTypeIdFresh
         });
       }, 100);
     }
-  }, [selectedTemplateId, userEmail, templates, createJobMutation, toast]);
+  }, [selectedDocumentTypeId, userEmail, documentTypes, createJobMutation, toast]);
 
   // Handle extracted data changes
   const handleExtractedDataChange = (field: string, value: string) => {
@@ -296,80 +301,45 @@ export default function DocumentProcessor() {
           <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700" data-testid="card-template-selection">
             <CardContent className="p-8">
               <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">1. Choose Template</h2>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Select the template you want to fill with extracted data</p>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">1. Choose Document Type</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Select the type of document you want to process. We'll automatically choose the best template format after analyzing your document.</p>
               </div>
               
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="template-select" className="text-sm font-medium text-gray-900 dark:text-white">Template</Label>
+                  <Label htmlFor="document-type-select" className="text-sm font-medium text-gray-900 dark:text-white">Document Type</Label>
                   <select
-                    id="template-select"
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    id="document-type-select"
+                    value={selectedDocumentTypeId}
+                    onChange={(e) => setSelectedDocumentTypeId(e.target.value)}
                     className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    data-testid="select-template"
+                    data-testid="select-document-type"
                   >
-                    <option value="" disabled>Select a template...</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.isAutoCreated ? '🤖 ' : '📄 '}{template.name}
-                        {template.isAutoCreated ? ' (AI-Detected)' : ''}
+                    <option value="" disabled>Select a document type...</option>
+                    {documentTypes.map((docType) => (
+                      <option key={docType.id} value={docType.id}>
+                        📄 {docType.name}
                       </option>
                     ))}
                   </select>
                 </div>
                 
-                {selectedTemplate && selectedTemplate.fieldMappings && (
+                {selectedDocumentType && (
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedTemplate.name}</div>
-                        {selectedTemplate.isAutoCreated && (
-                          <div className="flex items-center space-x-1">
-                            <Zap className="h-3 w-3 text-green-600" />
-                            <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">AI-Detected</span>
-                          </div>
-                        )}
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{selectedDocumentType.name}</div>
+                        <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">Document Type</span>
                       </div>
-                      {selectedTemplate.isAutoCreated && selectedTemplate.detectionMetadata?.confidence && (
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          Confidence: {Math.round((selectedTemplate.detectionMetadata.confidence || 0) * 100)}%
-                        </div>
-                      )}
                     </div>
                     
                     <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      {selectedTemplate.description || 'No description'}
+                      {selectedDocumentType.description || 'Document type selected. The system will automatically choose the best template format after processing your document.'}
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div className="text-gray-600 dark:text-gray-400">
-                        <span className="font-medium">Fields:</span> {Object.keys(selectedTemplate.fieldMappings || {}).length}
-                      </div>
-                      {selectedTemplate.isAutoCreated && (
-                        <div className="text-gray-600 dark:text-gray-400">
-                          <span className="font-medium">Type:</span> {selectedTemplate.templateType || 'custom'}
-                        </div>
-                      )}
+                    <div className="text-xs text-green-700 dark:text-green-300">
+                      <span className="font-medium">Smart Matching:</span> We'll automatically detect and use the correct template variant for your document format.
                     </div>
-                    
-                    {selectedTemplate.isAutoCreated && selectedTemplate.detectionMetadata && (
-                      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
-                        <div className="grid grid-cols-2 gap-4 text-xs text-gray-600 dark:text-gray-400">
-                          {selectedTemplate.detectionMetadata.totalMarkersFound && (
-                            <div>
-                              <span className="font-medium">Markers Found:</span> {selectedTemplate.detectionMetadata.totalMarkersFound}
-                            </div>
-                          )}
-                          {selectedTemplate.detectionMetadata.processingTime && (
-                            <div>
-                              <span className="font-medium">Analysis Time:</span> {Math.round(selectedTemplate.detectionMetadata.processingTime / 1000)}s
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
                 
@@ -421,12 +391,12 @@ export default function DocumentProcessor() {
                 <p className="text-gray-600 dark:text-gray-400 text-sm">Upload the document to extract data for your selected template</p>
               </div>
               
-              {templatesLoading ? (
+              {documentTypesLoading ? (
                 <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-12 text-center" data-testid="upload-loading">
                   <Clock className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                   <Skeleton className="h-6 w-48 mx-auto mb-2" />
                   <Skeleton className="h-4 w-32 mx-auto" />
-                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-4">Loading templates...</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-4">Loading document types...</p>
                 </div>
               ) : (
                 <ObjectUploader
