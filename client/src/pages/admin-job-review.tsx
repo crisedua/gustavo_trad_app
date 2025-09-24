@@ -340,8 +340,15 @@ export default function AdminJobReview() {
           <AlertDescription>
             <p className="mb-2">{alert.message}</p>
             <div className="text-sm space-y-1">
-              <p><strong>Detected:</strong> {alert.detectedDocumentType}</p>
-              <p><strong>Selected Template:</strong> {alert.selectedTemplateName}</p>
+              {alert.detectedDocumentType && (
+                <p><strong>Detected:</strong> {alert.detectedDocumentType}</p>
+              )}
+              {alert.selectedTemplateName && (
+                <p><strong>Selected Template:</strong> {alert.selectedTemplateName}</p>
+              )}
+              {alert.detectedFieldCount !== undefined && alert.templateFieldCount !== undefined && (
+                <p><strong>Field Analysis:</strong> {alert.matchingFieldCount || 0} matching out of {alert.templateFieldCount} template fields ({alert.detectedFieldCount} detected in document)</p>
+              )}
               <p><strong>Recommendation:</strong> {alert.recommendation}</p>
             </div>
           </AlertDescription>
