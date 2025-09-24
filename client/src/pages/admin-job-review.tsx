@@ -161,11 +161,20 @@ export default function AdminJobReview() {
       });
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Check if this is a validation failure
+      if (error.message && error.message.includes('Template validation failed')) {
+        toast({
+          title: "Template Validation Failed",
+          description: "The selected template is not compatible with your document. Please choose a different template that better matches your document structure.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Processing Error",
+          description: error.message || "An error occurred while processing the document.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
