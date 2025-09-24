@@ -86,6 +86,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/document-types", async (req, res) => {
+    try {
+      const { name, code, description } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ error: "name is required" });
+      }
+
+      if (!code) {
+        return res.status(400).json({ error: "code is required" });
+      }
+
+      const documentType = await storage.createDocumentType({
+        name,
+        code,
+        description: description || ''
+      });
+
+      res.status(201).json(documentType);
+    } catch (error) {
+      console.error("Error creating document type:", error);
+      res.status(500).json({ error: "Failed to create document type" });
+    }
+  });
+
   // Utility function to convert legacy fields array to new fieldMappings structure
   function convertLegacyFieldsToMappings(legacyFields: any[]): any {
     const fieldMappings: any = {};
