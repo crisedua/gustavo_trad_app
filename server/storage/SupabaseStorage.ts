@@ -127,62 +127,90 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    // ULTIMATE FIX: Use raw SQL to bypass column mapping issues completely
-    console.log('🚀 Using raw SQL approach to fix column mapping issues...');
+    // DIRECT FIX: Use explicit column mapping to handle database schema mismatch
+    console.log('🚀 Using explicit column mapping to fix schema issues...');
     
     try {
-      // Use raw SQL with explicit parameter binding to avoid column order issues
-      const { data, error } = await supabase.rpc('create_template_raw', {
-        p_name: insertData.name,
-        p_file_path: insertData.file_path,
-        p_field_mappings: safeFieldMappings,
-        p_detection_metadata: safeDetectionMetadata,
-        p_validation_rules: safeValidationRules
-      });
+      // Try with all columns explicitly specified in the exact order
+      const { data, error } = await supabase
+        .from('templates')
+        .insert({
+          id: undefined, // Let database generate UUID
+          name: insertData.name,
+          description: insertData.description || null,
+          file_path: insertData.file_path,
+          is_auto_created: insertData.is_auto_created || false,
+          source_document_path: insertData.source_document_path || null,
+          document_type_id: insertData.document_type_id || null,
+          document_version_id: insertData.document_version_id || null,
+          template_type: insertData.template_type || null,
+          detection_metadata: safeDetectionMetadata,
+          field_mappings: safeFieldMappings,
+          validation_rules: safeValidationRules,
+          created_at: undefined, // Let database set timestamp
+          updated_at: undefined  // Let database set timestamp
+        })
+        .select('*')
+        .single();
 
       if (error) {
-        console.log('❌ Raw SQL approach failed, falling back to direct insert with explicit columns...');
+        console.log('❌ Full column insert failed, trying minimal approach...');
         
-        // Alternative: Try a super simple insert with only essential data
-        const { data: simpleData, error: simpleError } = await supabase
+        // Try with absolute minimum - just the required fields
+        const { data: minimalData, error: minimalError } = await supabase
           .from('templates')
-          .insert([{
+          .insert({
             name: insertData.name,
-            file_path: insertData.file_path, 
+            file_path: insertData.file_path,
             field_mappings: safeFieldMappings
-          }])
+          })
           .select('*')
           .single();
           
-        if (simpleError) {
-          console.error('❌ Simple insert also failed:', simpleError);
+        if (minimalError) {
+          console.error('❌ Minimal insert failed:', minimalError);
           
-          // Last resort: Try with stringified JSONB
-          const { data: stringData, error: stringError } = await supabase
+          // Emergency: Try creating empty field_mappings first, then update
+          const { data: emptyData, error: emptyError } = await supabase
             .from('templates')
-            .insert([{
+            .insert({
               name: insertData.name,
               file_path: insertData.file_path,
-              field_mappings: JSON.stringify(safeFieldMappings)
-            }])
+              field_mappings: {}  // Empty object
+            })
             .select('*')
             .single();
             
-          if (stringError) {
-            console.error('❌ All insertion methods failed:', stringError);
-            throw stringError;
+          if (emptyError) {
+            console.error('❌ Empty template creation failed:', emptyError);
+            throw emptyError;
           }
           
-          console.log('✅ Template created with stringified approach:', stringData.id);
-          return this.mapDbRowToTemplate(stringData);
+          console.log('✅ Created empty template, now updating with field mappings...');
+          
+          // Now update with actual field mappings
+          const { data: updatedData, error: updateError } = await supabase
+            .from('templates')
+            .update({ field_mappings: safeFieldMappings })
+            .eq('id', emptyData.id)
+            .select('*')
+            .single();
+            
+          if (updateError) {
+            console.error('❌ Field mappings update failed:', updateError);
+            throw updateError;
+          }
+          
+          console.log('✅ Template created with two-step approach:', updatedData.id);
+          return this.mapDbRowToTemplate(updatedData);
         }
         
-        console.log('✅ Template created with simple approach:', simpleData.id);
-        return this.mapDbRowToTemplate(simpleData);
+        console.log('✅ Template created with minimal approach:', minimalData.id);
+        return this.mapDbRowToTemplate(minimalData);
       }
-      
-      console.log('✅ Template created with raw SQL:', data);
-      return data;
+
+      console.log('✅ Template created with explicit columns:', data.id);
+      return this.mapDbRowToTemplate(data);
 
     } catch (insertError) {
       console.error('❌ All template creation approaches failed:', insertError);
