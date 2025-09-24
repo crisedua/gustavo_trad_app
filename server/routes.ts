@@ -821,20 +821,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update status to intelligent template matching
       await storage.updateProcessingJob(job.id, { status: 'template_matching' });
 
-      // 🧠 INTELLIGENT TEMPLATE MATCHING
+      // 🧠 INTELLIGENT TEMPLATE MATCHING & VALIDATION
       console.log('🧠 Starting intelligent template matching...');
       let selectedTemplate: any | undefined = undefined;
       let templateMatchResults: any[] = [];
       
-      // For now, assume marriage certificate type (can be extended for other document types)
-      const marriageDocType = await storage.getDocumentTypeByCode('marriage_certificate');
-      
-      if (marriageDocType) {
-        console.log('📋 Found marriage certificate document type:', marriageDocType.id);
-        
-        // Get all templates for this document type
-        const availableTemplates = await storage.getTemplatesByDocumentType(marriageDocType.id);
-        console.log(`🔍 Found ${availableTemplates.length} available templates for matching`);
+      // 🔄 DYNAMIC APPROACH: Get ALL available templates (not limited to specific document types)
+      console.log('📋 Analyzing document content dynamically...');
+      const availableTemplates = await storage.getTemplates();
+      console.log(`🔍 Found ${availableTemplates.length} total available templates for analysis`);
         
         if (availableTemplates.length > 0) {
           // First, do a quick OCR field extraction to get field names for matching
@@ -897,47 +892,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
               selectedTemplate = await storage.getTemplate(job.templateId);
               console.log('🔄 Falling back to manually selected template:', selectedTemplate?.name);
               
-              // VALIDATION: Check for template mismatch and generate alert
-              if (selectedTemplate && marriageDocType) {
-                const templateDocType = selectedTemplate.documentTypeId;
-                const detectedDocTypeId = marriageDocType.id;
+              // 🎯 CONTENT-BASED VALIDATION: Compare OCR field structure vs selected template
+              if (selectedTemplate) {
+                console.log('🔍 Validating selected template against OCR field structure...');
                 
-                // Check if template is linked to a different document type
-                if (templateDocType && templateDocType !== detectedDocTypeId) {
-                  console.log('⚠️ TEMPLATE MISMATCH DETECTED!');
-                  console.log(`   Detected document type: ${marriageDocType.name} (${detectedDocTypeId})`);
-                  console.log(`   Selected template type: ${templateDocType}`);
+                // Extract OCR fields for validation
+                const quickOcrFields = await fieldExtractionService.extractBasicFieldsFromText(ocrResult);
+                console.log('📊 OCR detected fields:', Object.keys(quickOcrFields));
+                console.log('🎯 Template expected fields:', Object.keys(selectedTemplate.fieldMappings || {}));
+                
+                // Calculate compatibility score between OCR and template
+                const templateFields = Object.keys(selectedTemplate.fieldMappings || {});
+                const ocrFields = Object.keys(quickOcrFields);
+                
+                let matchingFields = 0;
+                templateFields.forEach(templateField => {
+                  const hasMatch = ocrFields.some(ocrField => 
+                    ocrField.toLowerCase().includes(templateField.toLowerCase()) ||
+                    templateField.toLowerCase().includes(ocrField.toLowerCase())
+                  );
+                  if (hasMatch) matchingFields++;
+                });
+                
+                const compatibilityScore = templateFields.length > 0 ? matchingFields / templateFields.length : 0;
+                console.log(`🎯 Template compatibility: ${matchingFields}/${templateFields.length} fields (${(compatibilityScore * 100).toFixed(1)}%)`);
+                
+                // Generate validation alert if compatibility is low
+                if (compatibilityScore < 0.3 && templateFields.length > 0) {
+                  console.log('⚠️ LOW COMPATIBILITY: Selected template may not match document structure');
                   
-                  // Store mismatch alert in job results
                   await storage.updateProcessingJob(job.id, {
                     versionDetectionResults: {
                       templateMismatchAlert: {
                         severity: 'warning',
-                        title: 'Template Format Mismatch',
-                        message: `You selected "${selectedTemplate.name}" template, but the uploaded document appears to be a different format. This may result in incorrect field mapping.`,
-                        detectedDocumentType: marriageDocType.name,
+                        title: 'Template Compatibility Warning',
+                        message: `The selected template "${selectedTemplate.name}" has low compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the detected document structure. This may result in incorrect field mapping.`,
+                        detectedFieldCount: ocrFields.length,
+                        templateFieldCount: templateFields.length,
+                        matchingFieldCount: matchingFields,
                         selectedTemplateName: selectedTemplate.name,
-                        confidence: 'high',
-                        recommendation: 'Please verify the template selection matches your document format.'
+                        confidence: 'medium',
+                        recommendation: 'Consider selecting a template that better matches the document fields or create a new template for this document format.'
                       },
                       ocrText: ocrResult.substring(0, 500),
                       processingTime: Date.now()
                     }
                   });
-                } else if (!templateDocType) {
-                  // Template has no document type set - generate info alert
-                  console.log('ℹ️ Template has no document type specified');
+                } else if (compatibilityScore >= 0.3 && compatibilityScore < 0.7) {
+                  console.log('ℹ️ MODERATE COMPATIBILITY: Template partially matches document structure');
                   
                   await storage.updateProcessingJob(job.id, {
                     versionDetectionResults: {
                       templateMismatchAlert: {
                         severity: 'info',
-                        title: 'Template Validation',
-                        message: `The selected template "${selectedTemplate.name}" is not categorized by document type. Please verify it matches your document format.`,
-                        detectedDocumentType: marriageDocType.name,
+                        title: 'Template Compatibility Notice',
+                        message: `The selected template "${selectedTemplate.name}" has moderate compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the document. Some fields may need manual verification.`,
+                        detectedFieldCount: ocrFields.length,
+                        templateFieldCount: templateFields.length,
+                        matchingFieldCount: matchingFields,
                         selectedTemplateName: selectedTemplate.name,
                         confidence: 'medium',
-                        recommendation: 'Review the template fields to ensure they match your document structure.'
+                        recommendation: 'Review the extracted field values to ensure accuracy.'
                       },
                       ocrText: ocrResult.substring(0, 500),
                       processingTime: Date.now()
@@ -948,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else {
-          console.log('❌ No templates found for document type');
+          console.log('❌ No templates available in the system');
           
           // Fallback to manual template selection if provided
           if (job.templateId) {
@@ -956,55 +971,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log('🔄 Using manually selected template:', selectedTemplate?.name);
           }
         }
-      } else {
-        console.log('❌ Marriage certificate document type not found in database');
         
-        // Fallback to manual template selection if provided
-        if (job.templateId) {
+        // 🎯 ADDITIONAL VALIDATION: If manual template was selected, validate against OCR
+        if (job.templateId && !selectedTemplate) {
           selectedTemplate = await storage.getTemplate(job.templateId);
-          console.log('🔄 Using manually selected template:', selectedTemplate?.name);
+          console.log('🔄 Loading manually selected template:', selectedTemplate?.name);
           
-          // VALIDATION: Check for template mismatch and generate alert
-          if (selectedTemplate && marriageDocType) {
-            const templateDocType = selectedTemplate.documentTypeId;
-            const detectedDocTypeId = marriageDocType.id;
+          // Perform content-based validation for manually selected template
+          if (selectedTemplate) {
+            console.log('🔍 Validating manually selected template against OCR content...');
             
-            // Check if template is linked to a different document type
-            if (templateDocType && templateDocType !== detectedDocTypeId) {
-              console.log('⚠️ TEMPLATE MISMATCH DETECTED!');
-              console.log(`   Detected document type: ${marriageDocType.name} (${detectedDocTypeId})`);
-              console.log(`   Selected template type: ${templateDocType}`);
+            // Extract OCR fields for validation
+            const quickOcrFields = await fieldExtractionService.extractBasicFieldsFromText(ocrResult);
+            console.log('📊 OCR detected fields:', Object.keys(quickOcrFields));
+            console.log('🎯 Template expected fields:', Object.keys(selectedTemplate.fieldMappings || {}));
+            
+            // Calculate compatibility score
+            const templateFields = Object.keys(selectedTemplate.fieldMappings || {});
+            const ocrFields = Object.keys(quickOcrFields);
+            
+            let matchingFields = 0;
+            templateFields.forEach(templateField => {
+              const hasMatch = ocrFields.some(ocrField => 
+                ocrField.toLowerCase().includes(templateField.toLowerCase()) ||
+                templateField.toLowerCase().includes(ocrField.toLowerCase())
+              );
+              if (hasMatch) matchingFields++;
+            });
+            
+            const compatibilityScore = templateFields.length > 0 ? matchingFields / templateFields.length : 0;
+            console.log(`🎯 Manual template compatibility: ${matchingFields}/${templateFields.length} fields (${(compatibilityScore * 100).toFixed(1)}%)`);
+            
+            // Generate validation alert for manual selection if compatibility is low
+            if (compatibilityScore < 0.3 && templateFields.length > 0) {
+              console.log('⚠️ LOW COMPATIBILITY: Manually selected template may not match document');
               
-              // Store mismatch alert in job results
               await storage.updateProcessingJob(job.id, {
                 versionDetectionResults: {
                   templateMismatchAlert: {
                     severity: 'warning',
-                    title: 'Template Format Mismatch',
-                    message: `You selected "${selectedTemplate.name}" template, but the uploaded document appears to be a different format. This may result in incorrect field mapping.`,
-                    detectedDocumentType: marriageDocType.name,
+                    title: 'Template Compatibility Warning',
+                    message: `The manually selected template "${selectedTemplate.name}" has low compatibility (${(compatibilityScore * 100).toFixed(1)}%) with the detected document structure. This may result in incorrect field mapping.`,
+                    detectedFieldCount: ocrFields.length,
+                    templateFieldCount: templateFields.length,
+                    matchingFieldCount: matchingFields,
                     selectedTemplateName: selectedTemplate.name,
                     confidence: 'high',
-                    recommendation: 'Please verify the template selection matches your document format.'
-                  },
-                  ocrText: ocrResult.substring(0, 500),
-                  processingTime: Date.now()
-                }
-              });
-            } else if (!templateDocType) {
-              // Template has no document type set - generate info alert
-              console.log('ℹ️ Template has no document type specified');
-              
-              await storage.updateProcessingJob(job.id, {
-                versionDetectionResults: {
-                  templateMismatchAlert: {
-                    severity: 'info',
-                    title: 'Template Validation',
-                    message: `The selected template "${selectedTemplate.name}" is not categorized by document type. Please verify it matches your document format.`,
-                    detectedDocumentType: marriageDocType.name,
-                    selectedTemplateName: selectedTemplate.name,
-                    confidence: 'medium',
-                    recommendation: 'Review the template fields to ensure they match your document structure.'
+                    recommendation: 'Consider selecting a different template that better matches the document fields.'
                   },
                   ocrText: ocrResult.substring(0, 500),
                   processingTime: Date.now()
@@ -1013,7 +1026,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-      }
       
       // Update job status to extraction
       await storage.updateProcessingJob(job.id, { status: 'extraction' });
