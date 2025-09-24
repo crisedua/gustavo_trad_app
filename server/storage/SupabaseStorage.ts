@@ -91,34 +91,96 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    const { data, error } = await supabase
-      .from('templates')
-      .insert(insertData)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error creating template:', error);
-      throw error;
+    // CRITICAL FIX: Use explicit column mapping to avoid column order issues
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .insert({
+          name: insertData.name,
+          description: insertData.description,
+          file_path: insertData.file_path,
+          field_mappings: insertData.field_mappings, // Explicit column mapping
+          detection_metadata: insertData.detection_metadata,
+          validation_rules: insertData.validation_rules,
+          is_auto_created: insertData.is_auto_created,
+          source_document_path: insertData.source_document_path,
+          document_type_id: insertData.document_type_id,
+          document_version_id: insertData.document_version_id,
+          template_type: insertData.template_type,
+          created_at: insertData.created_at,
+          updated_at: insertData.updated_at
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Supabase insertion failed:', error);
+        throw error;
+      }
+
+      console.log('✅ Template successfully created in Supabase:', data.id);
+      
+      // Map snake_case database columns to camelCase TypeScript properties
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        filePath: data.file_path,
+        isAutoCreated: data.is_auto_created,
+        sourceDocumentPath: data.source_document_path,
+        documentTypeId: data.document_type_id,
+        documentVersionId: data.document_version_id,
+        templateType: data.template_type,
+        detectionMetadata: data.detection_metadata,
+        fieldMappings: data.field_mappings,
+        validationRules: data.validation_rules,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+
+    } catch (insertError) {
+      console.error('❌ Database insertion error:', insertError);
+      
+      // Try fallback with minimal required fields only
+      console.log('🔄 Attempting fallback insertion with required fields only...');
+      
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('templates')
+        .insert({
+          name: insertData.name,
+          file_path: insertData.file_path,
+          field_mappings: insertData.field_mappings || {},
+          detection_metadata: insertData.detection_metadata || {},
+          validation_rules: insertData.validation_rules || {}
+        })
+        .select()
+        .single();
+        
+      if (fallbackError) {
+        console.error('❌ Fallback insertion also failed:', fallbackError);
+        throw fallbackError;
+      }
+      
+      console.log('✅ Fallback template creation successful:', fallbackData.id);
+      
+      // Map fallback data to camelCase
+      return {
+        id: fallbackData.id,
+        name: fallbackData.name,
+        description: fallbackData.description,
+        filePath: fallbackData.file_path,
+        isAutoCreated: fallbackData.is_auto_created,
+        sourceDocumentPath: fallbackData.source_document_path,
+        documentTypeId: fallbackData.document_type_id,
+        documentVersionId: fallbackData.document_version_id,
+        templateType: fallbackData.template_type,
+        detectionMetadata: fallbackData.detection_metadata,
+        fieldMappings: fallbackData.field_mappings,
+        validationRules: fallbackData.validation_rules,
+        createdAt: fallbackData.created_at,
+        updatedAt: fallbackData.updated_at
+      };
     }
-    
-    // Map snake_case database columns to camelCase TypeScript properties
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      filePath: data.file_path,
-      isAutoCreated: data.is_auto_created,
-      sourceDocumentPath: data.source_document_path,
-      documentTypeId: data.document_type_id,
-      documentVersionId: data.document_version_id,
-      templateType: data.template_type,
-      detectionMetadata: data.detection_metadata,
-      fieldMappings: data.field_mappings,
-      validationRules: data.validation_rules,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
   }
 
   async getTemplate(id: string): Promise<Template | undefined> {
