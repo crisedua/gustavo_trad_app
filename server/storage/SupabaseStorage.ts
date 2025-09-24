@@ -921,6 +921,59 @@ export class SupabaseStorage implements IStorage {
       });
       console.log('✅ Created Birth Certificate New Format document version');
     }
+
+    // Create DIAN Tax Form document type
+    let dianDocType: DocumentType;
+    const existingDianType = await this.getDocumentTypeByCode('dian_tax_form');
+    
+    if (existingDianType) {
+      dianDocType = existingDianType;
+      console.log('✅ DIAN Tax Form document type already exists');
+    } else {
+      dianDocType = await this.createDocumentType({
+        name: 'DIAN Formulario',
+        code: 'dian_tax_form',
+        description: 'Colombian tax forms and declarations (DIAN)'
+      });
+      console.log('✅ Created DIAN Tax Form document type');
+    }
+    
+    // Create DIAN Tax Form version
+    const { data: existingDianVersion } = await supabase
+      .from('document_versions')
+      .select('*')
+      .eq('document_type_id', dianDocType.id)
+      .eq('code', 'standard_form')
+      .single();
+    
+    if (!existingDianVersion) {
+      await this.createDocumentVersion({
+        documentTypeId: dianDocType.id,
+        name: 'Standard Form',
+        code: 'standard_form',
+        description: 'Standard DIAN tax form format',
+        detectionPatterns: {
+          keywords: [
+            'DIAN',
+            'Dirección de Impuestos',
+            'Impuesto sobre la Renta',
+            'Formulario',
+            'Declaración',
+            'RUT',
+            'NIT'
+          ],
+          excludeKeywords: [],
+          layoutIndicators: [
+            'TAX_FORM',
+            'FORM_NUMBER',
+            'YEAR_FIELD'
+          ],
+          confidence: 0.8,
+          language: 'es'
+        }
+      });
+      console.log('✅ Created DIAN Tax Form Standard version');
+    }
     
     console.log('🎉 Document types and versions initialization complete');
   }

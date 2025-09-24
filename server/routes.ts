@@ -111,6 +111,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/document-types/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteDocumentType(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Document type not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting document type:", error);
+      res.status(500).json({ error: "Failed to delete document type" });
+    }
+  });
+
   // Utility function to convert legacy fields array to new fieldMappings structure
   function convertLegacyFieldsToMappings(legacyFields: any[]): any {
     const fieldMappings: any = {};
