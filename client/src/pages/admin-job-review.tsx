@@ -36,7 +36,8 @@ import {
   Save,
   RefreshCw,
   FileCheck,
-  Upload
+  Upload,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -224,6 +225,33 @@ export default function AdminJobReview() {
       });
     },
   });
+
+  // Delete processing job mutation
+  const deleteJobMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('DELETE', `/api/processing-jobs/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/processing-jobs'] });
+      toast({
+        title: "Request Deleted",
+        description: "The processing request has been deleted successfully.",
+      });
+      // Navigate back to requests list
+      navigate("/admin/requests");
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // State for delete confirmation dialog
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Handle template selection change
   const handleTemplateChange = (templateId: string) => {
@@ -517,6 +545,56 @@ export default function AdminJobReview() {
               <StatusBadge status={job.status} />
             </div>
             <div className="flex items-center space-x-4">
+              {/* Delete button for pending requests */}
+              {(job.status === 'pending_review' || job.status === 'uploading' || job.status === 'error') && (
+                <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      data-testid="button-delete-request"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Request
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Delete Processing Request</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to delete this processing request? This action cannot be undone.
+                        The uploaded file and all extracted data will be permanently removed.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex items-center space-x-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowDeleteDialog(false)}
+                        data-testid="button-cancel-delete"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          deleteJobMutation.mutate();
+                          setShowDeleteDialog(false);
+                        }}
+                        disabled={deleteJobMutation.isPending}
+                        data-testid="button-confirm-delete"
+                      >
+                        {deleteJobMutation.isPending ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Delete Request
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+              
               <Link href="/admin/requests">
                 <Button variant="outline" size="sm" data-testid="button-back-requests">
                   <ArrowLeft className="h-4 w-4 mr-2" />
