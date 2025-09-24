@@ -338,13 +338,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sanitize detection metadata before storing and responding
       const sanitizedDetectionMetadata = sanitizeDetectionMetadata(detectionMetadata);
 
-      const templateData = insertTemplateSchema.parse({
+      // Debug: Log data before schema parsing
+      console.log('🔍 Data before schema parsing:', {
         name,
         description: description || null,
         filePath: templatePath,
-        fieldMappings,
-        detectionMetadata: sanitizedDetectionMetadata
+        fieldMappingsIsNull: fieldMappings === null,
+        fieldMappingsType: typeof fieldMappings,
+        fieldMappingsKeys: fieldMappings ? Object.keys(fieldMappings).length : 0,
+        detectionMetadataType: typeof sanitizedDetectionMetadata
       });
+
+      let templateData;
+      try {
+        templateData = insertTemplateSchema.parse({
+          name,
+          description: description || null,
+          filePath: templatePath,
+          fieldMappings,
+          detectionMetadata: sanitizedDetectionMetadata
+        });
+        
+        console.log('✅ Schema parsing successful, templateData:', {
+          fieldMappingsInTemplateData: !!templateData.fieldMappings,
+          fieldMappingsKeysInTemplateData: templateData.fieldMappings ? Object.keys(templateData.fieldMappings).length : 0
+        });
+
+      } catch (schemaError) {
+        console.error('❌ Schema parsing failed:', schemaError);
+        console.error('Schema validation error details:', schemaError instanceof Error ? schemaError.message : String(schemaError));
+        
+        // Try with empty fieldMappings as fallback
+        console.log('Attempting fallback with empty fieldMappings...');
+        templateData = insertTemplateSchema.parse({
+          name,
+          description: description || null,
+          filePath: templatePath,
+          fieldMappings: {},
+          detectionMetadata: sanitizedDetectionMetadata
+        });
+        
+        console.log('✅ Fallback schema parsing successful');
+      }
 
       const template = await storage.createTemplate(templateData);
       
