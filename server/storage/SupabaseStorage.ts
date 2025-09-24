@@ -275,7 +275,8 @@ export class SupabaseStorage implements IStorage {
         extracted_data: insertJob.extractedData || {},
         template_id: insertJob.templateId,
         extracted_field_values: insertJob.extractedFieldValues || {},
-        selected_document_type_id: insertJob.selectedDocumentTypeId,
+        // Temporarily comment out until column is added
+        // selected_document_type_id: insertJob.selectedDocumentTypeId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -298,7 +299,7 @@ export class SupabaseStorage implements IStorage {
       extractedFieldValues: data.extracted_field_values,
       generatedDocumentPath: data.generated_document_path,
       errorMessage: data.error_message,
-      selectedDocumentTypeId: data.selected_document_type_id,
+      selectedDocumentTypeId: data.selected_document_type_id || null,
       detectedVersionId: data.detected_version_id,
       versionDetectionResults: data.version_detection_results,
       createdAt: data.created_at,
@@ -331,7 +332,7 @@ export class SupabaseStorage implements IStorage {
       extractedFieldValues: data.extracted_field_values,
       generatedDocumentPath: data.generated_document_path,
       errorMessage: data.error_message,
-      selectedDocumentTypeId: data.selected_document_type_id,
+      selectedDocumentTypeId: data.selected_document_type_id || null,
       detectedVersionId: data.detected_version_id,
       versionDetectionResults: data.version_detection_results,
       createdAt: data.created_at,

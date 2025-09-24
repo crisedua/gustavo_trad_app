@@ -917,10 +917,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let templateMatchResults: any[] = [];
       
       // 🎯 DOCUMENT TYPE-BASED TEMPLATE SELECTION
+      // TEMPORARY: Get document type from frontend request since database column is missing
+      // Try to get from query params, body, or job data
+      const selectedDocumentTypeId = job.selectedDocumentTypeId || req.query.documentTypeId || req.body.selectedDocumentTypeId;
+      console.log('🔍 Using document type ID for template selection:', selectedDocumentTypeId);
+      
       let availableTemplates;
-      if (job.selectedDocumentTypeId) {
-        console.log('📋 Using document type-based template selection for:', job.selectedDocumentTypeId);
-        availableTemplates = await storage.getTemplatesByDocumentType(job.selectedDocumentTypeId);
+      if (selectedDocumentTypeId) {
+        console.log('📋 Using document type-based template selection for:', selectedDocumentTypeId);
+        availableTemplates = await storage.getTemplatesByDocumentType(selectedDocumentTypeId);
         console.log(`🔍 Found ${availableTemplates.length} templates for the selected document type`);
       } else {
         // Fallback to all templates for backward compatibility
