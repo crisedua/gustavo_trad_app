@@ -41,7 +41,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Feature Cards */}
+        {/* Hidden: Feature Cards
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <Card className="text-center" data-testid="card-feature-upload">
             <CardHeader>
@@ -91,6 +91,7 @@ export default function Home() {
             </CardContent>
           </Card>
         </div>
+        */}
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -191,7 +192,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Process Overview */}
+        {/* Hidden: Process Overview
         <div className="mt-16 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center">
             How It Works
@@ -228,6 +229,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+        */}
       </div>
     </div>
   );
