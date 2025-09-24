@@ -275,6 +275,7 @@ export class SupabaseStorage implements IStorage {
         extracted_data: insertJob.extractedData || {},
         template_id: insertJob.templateId,
         extracted_field_values: insertJob.extractedFieldValues || {},
+        selected_document_type_id: insertJob.selectedDocumentTypeId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
