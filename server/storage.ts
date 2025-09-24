@@ -12,6 +12,7 @@ export interface IStorage {
   getDocumentType(id: string): Promise<DocumentType | undefined>;
   getDocumentTypes(): Promise<DocumentType[]>;
   getDocumentTypeByCode(code: string): Promise<DocumentType | undefined>;
+  deleteDocumentType(id: string): Promise<boolean>;
   
   // Document version methods
   createDocumentVersion(documentVersion: InsertDocumentVersion): Promise<DocumentVersion>;
@@ -466,6 +467,10 @@ export class MemStorage implements IStorage {
 
   async getDocumentTypes(): Promise<DocumentType[]> {
     return Array.from(this.documentTypes.values());
+  }
+
+  async deleteDocumentType(id: string): Promise<boolean> {
+    return this.documentTypes.delete(id);
   }
 
   async getDocumentTypeByCode(code: string): Promise<DocumentType | undefined> {

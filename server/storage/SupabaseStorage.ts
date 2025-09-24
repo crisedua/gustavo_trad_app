@@ -1083,6 +1083,20 @@ export class SupabaseStorage implements IStorage {
     };
   }
 
+  async deleteDocumentType(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('document_types')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting document type:', error);
+      return false;
+    }
+    
+    return true;
+  }
+
   // Document version methods
   async createDocumentVersion(documentVersion: InsertDocumentVersion): Promise<DocumentVersion> {
     const { data, error } = await supabase
