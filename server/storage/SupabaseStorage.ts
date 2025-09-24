@@ -127,89 +127,89 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    // EMERGENCY FIX: Try with minimal required fields first to diagnose the issue
-    console.log('🚀 Attempting template creation with minimal fields approach...');
+    // ULTIMATE FIX: Use raw SQL to bypass column mapping issues completely
+    console.log('🚀 Using raw SQL approach to fix column mapping issues...');
     
     try {
-      // First attempt: Only absolutely required fields
-      const { data, error } = await supabase
-        .from('templates')
-        .insert({
-          name: insertData.name,
-          file_path: insertData.file_path,
-          field_mappings: safeFieldMappings
-        })
-        .select()
-        .single();
+      // Use raw SQL with explicit parameter binding to avoid column order issues
+      const { data, error } = await supabase.rpc('create_template_raw', {
+        p_name: insertData.name,
+        p_file_path: insertData.file_path,
+        p_field_mappings: safeFieldMappings,
+        p_detection_metadata: safeDetectionMetadata,
+        p_validation_rules: safeValidationRules
+      });
 
       if (error) {
-        console.error('❌ Supabase insertion failed:', error);
-        throw error;
+        console.log('❌ Raw SQL approach failed, falling back to direct insert with explicit columns...');
+        
+        // Alternative: Try a super simple insert with only essential data
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('templates')
+          .insert([{
+            name: insertData.name,
+            file_path: insertData.file_path, 
+            field_mappings: safeFieldMappings
+          }])
+          .select('*')
+          .single();
+          
+        if (simpleError) {
+          console.error('❌ Simple insert also failed:', simpleError);
+          
+          // Last resort: Try with stringified JSONB
+          const { data: stringData, error: stringError } = await supabase
+            .from('templates')
+            .insert([{
+              name: insertData.name,
+              file_path: insertData.file_path,
+              field_mappings: JSON.stringify(safeFieldMappings)
+            }])
+            .select('*')
+            .single();
+            
+          if (stringError) {
+            console.error('❌ All insertion methods failed:', stringError);
+            throw stringError;
+          }
+          
+          console.log('✅ Template created with stringified approach:', stringData.id);
+          return this.mapDbRowToTemplate(stringData);
+        }
+        
+        console.log('✅ Template created with simple approach:', simpleData.id);
+        return this.mapDbRowToTemplate(simpleData);
       }
-
-      console.log('✅ Template successfully created in Supabase:', data.id);
       
-      // Map snake_case database columns to camelCase TypeScript properties
-      return {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        filePath: data.file_path,
-        isAutoCreated: data.is_auto_created,
-        sourceDocumentPath: data.source_document_path,
-        documentTypeId: data.document_type_id,
-        documentVersionId: data.document_version_id,
-        templateType: data.template_type,
-        detectionMetadata: data.detection_metadata,
-        fieldMappings: data.field_mappings,
-        validationRules: data.validation_rules,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
-      };
+      console.log('✅ Template created with raw SQL:', data);
+      return data;
 
     } catch (insertError) {
-      console.error('❌ Database insertion error:', insertError);
-      
-      // Try fallback with minimal required fields only
-      console.log('🔄 Attempting fallback insertion with required fields only...');
-      
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('templates')
-        .insert({
-          name: insertData.name,
-          file_path: insertData.file_path,
-          field_mappings: insertData.field_mappings || {},
-          detection_metadata: insertData.detection_metadata || {},
-          validation_rules: insertData.validation_rules || {}
-        })
-        .select()
-        .single();
-        
-      if (fallbackError) {
-        console.error('❌ Fallback insertion also failed:', fallbackError);
-        throw fallbackError;
-      }
-      
-      console.log('✅ Fallback template creation successful:', fallbackData.id);
-      
-      // Map fallback data to camelCase
-      return {
-        id: fallbackData.id,
-        name: fallbackData.name,
-        description: fallbackData.description,
-        filePath: fallbackData.file_path,
-        isAutoCreated: fallbackData.is_auto_created,
-        sourceDocumentPath: fallbackData.source_document_path,
-        documentTypeId: fallbackData.document_type_id,
-        documentVersionId: fallbackData.document_version_id,
-        templateType: fallbackData.template_type,
-        detectionMetadata: fallbackData.detection_metadata,
-        fieldMappings: fallbackData.field_mappings,
-        validationRules: fallbackData.validation_rules,
-        createdAt: fallbackData.created_at,
-        updatedAt: fallbackData.updated_at
-      };
+      console.error('❌ All template creation approaches failed:', insertError);
+      throw insertError;
     }
+  }
+
+  // Helper method to map database row to Template object
+  private mapDbRowToTemplate(data: any): Template {
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      filePath: data.file_path,
+      isAutoCreated: data.is_auto_created || false,
+      sourceDocumentPath: data.source_document_path,
+      documentTypeId: data.document_type_id,
+      documentVersionId: data.document_version_id,
+      templateType: data.template_type,
+      detectionMetadata: data.detection_metadata || {},
+      fieldMappings: typeof data.field_mappings === 'string' 
+        ? JSON.parse(data.field_mappings) 
+        : (data.field_mappings || {}),
+      validationRules: data.validation_rules || {},
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async getTemplate(id: string): Promise<Template | undefined> {
