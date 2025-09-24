@@ -112,8 +112,14 @@ export default function AdminJobReview() {
 
   // Initialize editable fields when job data is loaded
   useEffect(() => {
-    if (job?.extractedFieldValues) {
-      setEditableFields(job.extractedFieldValues);
+    // Merge extractedFieldValues and extractedData to get all available field values
+    const mergedFields = {
+      ...(job?.extractedData || {}),
+      ...(job?.extractedFieldValues || {}), // extractedFieldValues takes precedence
+    };
+    
+    if (Object.keys(mergedFields).length > 0) {
+      setEditableFields(mergedFields);
     }
     if (job?.templateId) {
       setSelectedTemplateId(job.templateId);
@@ -245,10 +251,19 @@ export default function AdminJobReview() {
   const getComprehensiveFieldList = () => {
     const templateFieldMappings = getTemplateFieldMappings();
     const templateFieldNames = Object.keys(templateFieldMappings);
-    const extractedFieldNames = Object.keys(editableFields || {});
+    
+    // Get all field names from both sources
+    const ocrExtractedFieldNames = Object.keys(job?.extractedData || {});
+    const processedFieldNames = Object.keys(job?.extractedFieldValues || {});
+    const editableFieldNames = Object.keys(editableFields || {});
     
     // Combine all field names and remove duplicates
-    const allFieldNames = Array.from(new Set([...templateFieldNames, ...extractedFieldNames]));
+    const allFieldNames = Array.from(new Set([
+      ...templateFieldNames, 
+      ...ocrExtractedFieldNames, 
+      ...processedFieldNames, 
+      ...editableFieldNames
+    ]));
     
     // Create comprehensive field data
     return allFieldNames.map(fieldName => {
@@ -256,19 +271,28 @@ export default function AdminJobReview() {
       const extractedValue = editableFields?.[fieldName] || '';
       const fieldDefinition = fieldMapping?.fieldDefinition;
       
+      // Determine field source
+      const isFromTemplate = !!fieldMapping;
+      const isFromOCR = ocrExtractedFieldNames.includes(fieldName);
+      const isFromProcessed = processedFieldNames.includes(fieldName);
+      
       return {
         name: fieldName,
         value: extractedValue,
-        label: fieldDefinition?.label || fieldName,
+        label: fieldDefinition?.label || fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
         type: fieldDefinition?.type || 'text',
         description: fieldDefinition?.description,
-        isFromTemplate: !!fieldMapping,
-        isExtracted: extractedFieldNames.includes(fieldName)
+        isFromTemplate,
+        isExtracted: isFromOCR || isFromProcessed,
+        isFromOCR,
+        isFromProcessed
       };
     }).sort((a, b) => {
-      // Sort by: template fields first, then extracted-only fields
+      // Sort by: template fields first, then OCR extracted fields, then others
       if (a.isFromTemplate && !b.isFromTemplate) return -1;
       if (!a.isFromTemplate && b.isFromTemplate) return 1;
+      if (a.isFromOCR && !b.isFromOCR) return -1;
+      if (!a.isFromOCR && b.isFromOCR) return 1;
       return a.label.localeCompare(b.label);
     });
   };
@@ -644,12 +668,17 @@ export default function AdminJobReview() {
                               Template
                             </Badge>
                           )}
-                          {field.isExtracted && (
-                            <Badge variant="default" className="text-xs px-1 py-0 h-5 bg-green-100 text-green-800">
-                              Extracted
+                          {field.isFromOCR && (
+                            <Badge variant="default" className="text-xs px-1 py-0 h-5 bg-blue-100 text-blue-800">
+                              OCR
                             </Badge>
                           )}
-                          {!field.isExtracted && field.isFromTemplate && (
+                          {field.isFromProcessed && (
+                            <Badge variant="default" className="text-xs px-1 py-0 h-5 bg-green-100 text-green-800">
+                              Processed
+                            </Badge>
+                          )}
+                          {field.isFromTemplate && !field.isExtracted && (
                             <Badge variant="destructive" className="text-xs px-1 py-0 h-5">
                               Missing
                             </Badge>
