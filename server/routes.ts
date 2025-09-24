@@ -680,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/processing-jobs", async (req, res) => {
     try {
-      const { originalFilePath, userEmail, templateId } = req.body;
+      const { originalFilePath, userEmail, selectedDocumentTypeId, templateId } = req.body;
 
       if (!originalFilePath) {
         return res.status(400).json({ error: "originalFilePath is required" });
@@ -690,10 +690,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "userEmail is required" });
       }
 
+      // If selectedDocumentTypeId is provided, use it; otherwise fall back to templateId for backward compatibility
       const jobData = insertProcessingJobSchema.parse({
         originalFilePath,
         userEmail,
         templateId: templateId || null,
+        selectedDocumentTypeId: selectedDocumentTypeId || null,
         status: 'pending_review',
         extractedData: {},
         extractedFieldValues: {}
@@ -826,10 +828,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let selectedTemplate: any | undefined = undefined;
       let templateMatchResults: any[] = [];
       
-      // 🔄 DYNAMIC APPROACH: Get ALL available templates (not limited to specific document types)
-      console.log('📋 Analyzing document content dynamically...');
-      const availableTemplates = await storage.getTemplates();
-      console.log(`🔍 Found ${availableTemplates.length} total available templates for analysis`);
+      // 🎯 DOCUMENT TYPE-BASED TEMPLATE SELECTION
+      let availableTemplates;
+      if (job.selectedDocumentTypeId) {
+        console.log('📋 Using document type-based template selection for:', job.selectedDocumentTypeId);
+        availableTemplates = await storage.getTemplatesByDocumentType(job.selectedDocumentTypeId);
+        console.log(`🔍 Found ${availableTemplates.length} templates for the selected document type`);
+      } else {
+        // Fallback to all templates for backward compatibility
+        console.log('📋 Analyzing document content dynamically (all templates)...');
+        availableTemplates = await storage.getTemplates();
+        console.log(`🔍 Found ${availableTemplates.length} total available templates for analysis`);
+      }
         
         if (availableTemplates.length > 0) {
           // First, do a quick OCR field extraction to get field names for matching
@@ -886,6 +896,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           } else {
             console.log('⚠️ No good template matches found (all scores below threshold or no confidence)');
+            
+            // For document type selection, provide specific error message
+            if (job.selectedDocumentTypeId) {
+              console.log('❌ No compatible templates found in the selected document type');
+              
+              // Get document type name for better error message
+              const documentType = await storage.getDocumentType(job.selectedDocumentTypeId);
+              const documentTypeName = documentType?.name || 'selected document type';
+              
+              await storage.updateProcessingJob(job.id, {
+                status: 'validation_failed',
+                versionDetectionResults: {
+                  templateMismatchAlert: {
+                    severity: 'error',
+                    title: 'No Compatible Templates Found',
+                    message: `No templates in the ${documentTypeName} category are compatible with your document format. The system analyzed ${availableTemplates.length} templates but none matched the document structure well enough to proceed.`,
+                    detectedFieldCount: 0,
+                    templateFieldCount: 0,
+                    matchingFieldCount: 0,
+                    selectedDocumentType: documentTypeName,
+                    confidence: 'high',
+                    recommendation: `Please check if you selected the correct document type. If this document is a different format or variant of ${documentTypeName}, you may need to create a new template for it.`
+                  },
+                  ocrText: ocrResult.substring(0, 500),
+                  processingTime: Date.now()
+                }
+              });
+              
+              return res.status(400).json({ 
+                error: "No compatible templates found", 
+                details: `None of the ${availableTemplates.length} templates in the ${documentTypeName} category are compatible with your document format.`,
+                recommendation: `Please verify you selected the correct document type, or consider creating a new template for this document variant.`
+              });
+            }
             
             // Fallback to manual template selection if provided
             if (job.templateId) {
@@ -972,12 +1016,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else {
-          console.log('❌ No templates available in the system');
-          
-          // Fallback to manual template selection if provided
-          if (job.templateId) {
-            selectedTemplate = await storage.getTemplate(job.templateId);
-            console.log('🔄 Using manually selected template:', selectedTemplate?.name);
+          // No templates available for processing
+          if (job.selectedDocumentTypeId) {
+            console.log('❌ No templates available for the selected document type');
+            
+            // Get document type name for better error message
+            const documentType = await storage.getDocumentType(job.selectedDocumentTypeId);
+            const documentTypeName = documentType?.name || 'selected document type';
+            
+            await storage.updateProcessingJob(job.id, {
+              status: 'validation_failed',
+              versionDetectionResults: {
+                templateMismatchAlert: {
+                  severity: 'error',
+                  title: 'No Templates Available',
+                  message: `There are no templates configured for the ${documentTypeName} document type. You'll need to create at least one template before processing documents of this type.`,
+                  detectedFieldCount: 0,
+                  templateFieldCount: 0,
+                  matchingFieldCount: 0,
+                  selectedDocumentType: documentTypeName,
+                  confidence: 'high',
+                  recommendation: `Please contact the administrator to create templates for ${documentTypeName} documents, or select a different document type.`
+                },
+                ocrText: ocrResult.substring(0, 500),
+                processingTime: Date.now()
+              }
+            });
+            
+            return res.status(400).json({ 
+              error: "No templates available", 
+              details: `No templates are configured for the ${documentTypeName} document type.`,
+              recommendation: `Please create templates for this document type before processing.`
+            });
+          } else {
+            console.log('❌ No templates available in the system');
+            
+            // Fallback to manual template selection if provided
+            if (job.templateId) {
+              selectedTemplate = await storage.getTemplate(job.templateId);
+              console.log('🔄 Using manually selected template:', selectedTemplate?.name);
+            }
           }
         }
         
