@@ -58,9 +58,45 @@ export class SupabaseStorage implements IStorage {
       sampleFieldMapping: insertTemplate.fieldMappings ? Object.entries(insertTemplate.fieldMappings)[0] : null
     });
 
-    // CRITICAL FIX: Ensure JSONB fields are properly serialized and never null
-    const safeFieldMappings = insertTemplate.fieldMappings || {};
-    const safeDetectionMetadata = insertTemplate.detectionMetadata || {};
+    // CRITICAL FIX: Ensure JSONB fields are properly structured for Supabase
+    let safeFieldMappings = insertTemplate.fieldMappings;
+    
+    // If fieldMappings is empty or null, provide minimal valid structure
+    if (!safeFieldMappings || Object.keys(safeFieldMappings).length === 0) {
+      console.warn('⚠️  No field mappings provided, creating minimal structure');
+      safeFieldMappings = {
+        "default_field": {
+          instances: [{
+            coordinates: {
+              page: 1,
+              rect: { x: 0, y: 0, width: 100, height: 20 },
+              rotation: 0,
+              units: 'pdf_points',
+              origin: 'bottom-left'
+            },
+            detectionConfidence: 0.5,
+            detectionMethod: 'manual'
+          }],
+          fieldDefinition: {
+            type: 'text',
+            label: 'Default Field',
+            description: 'Default field mapping'
+          },
+          detectionSummary: {
+            totalInstancesFound: 1,
+            averageConfidence: 0.5,
+            detectionMethod: 'manual',
+            conflictingInstances: false
+          }
+        }
+      };
+    }
+    
+    const safeDetectionMetadata = insertTemplate.detectionMetadata || {
+      confidence: 0.5,
+      processingTime: 0,
+      detectionMethod: 'manual'
+    };
     const safeValidationRules = insertTemplate.validationRules || {};
 
     const insertData = {
@@ -91,24 +127,17 @@ export class SupabaseStorage implements IStorage {
       fieldMappingsStringified: insertData.field_mappings ? JSON.stringify(insertData.field_mappings).substring(0, 200) + '...' : null
     });
 
-    // CRITICAL FIX: Use explicit column mapping to avoid column order issues
+    // EMERGENCY FIX: Try with minimal required fields first to diagnose the issue
+    console.log('🚀 Attempting template creation with minimal fields approach...');
+    
     try {
+      // First attempt: Only absolutely required fields
       const { data, error } = await supabase
         .from('templates')
         .insert({
           name: insertData.name,
-          description: insertData.description,
           file_path: insertData.file_path,
-          field_mappings: insertData.field_mappings, // Explicit column mapping
-          detection_metadata: insertData.detection_metadata,
-          validation_rules: insertData.validation_rules,
-          is_auto_created: insertData.is_auto_created,
-          source_document_path: insertData.source_document_path,
-          document_type_id: insertData.document_type_id,
-          document_version_id: insertData.document_version_id,
-          template_type: insertData.template_type,
-          created_at: insertData.created_at,
-          updated_at: insertData.updated_at
+          field_mappings: safeFieldMappings
         })
         .select()
         .single();
