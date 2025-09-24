@@ -78,7 +78,8 @@ const statusColors = {
   'mapping': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
   'generation': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
   'completed': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  'error': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+  'error': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  'validation_failed': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
 };
 
 const statusIcons = {
@@ -89,7 +90,8 @@ const statusIcons = {
   'mapping': Target,
   'generation': Settings,
   'completed': CheckCircle,
-  'error': XCircle
+  'error': XCircle,
+  'validation_failed': AlertTriangle
 };
 
 export default function AdminJobReview() {
@@ -573,8 +575,8 @@ export default function AdminJobReview() {
               <StatusBadge status={job.status} />
             </div>
             <div className="flex items-center space-x-4">
-              {/* Delete button for pending requests */}
-              {(job.status === 'pending_review' || job.status === 'uploading' || job.status === 'error') && (
+              {/* Delete button for pending/failed requests */}
+              {(job.status === 'pending_review' || job.status === 'uploading' || job.status === 'error' || job.status === 'validation_failed') && (
                 <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                   <DialogTrigger asChild>
                     <Button 
@@ -749,6 +751,36 @@ export default function AdminJobReview() {
 
               <Separator />
 
+              {/* Validation Failed Section */}
+              {job.status === 'validation_failed' && (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <h3 className="font-medium text-red-900 dark:text-red-100">Validation Failed</h3>
+                    </div>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      The selected template is not compatible with the uploaded document format. 
+                      Please select a different template that better matches your document structure.
+                    </p>
+                    <Alert variant="destructive" className="border-red-200">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Template Compatibility Issue</AlertTitle>
+                      <AlertDescription className="text-sm">
+                        {renderTemplateMatchingAlerts() ? 
+                          // Extract message from the alert if available
+                          (job as any)?.versionDetectionResults?.templateMismatchAlert?.message ||
+                          "The selected template has very low compatibility with the document structure."
+                          :
+                          "Template validation failed - please select a compatible template."
+                        }
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                  <Separator />
+                </>
+              )}
+
               {/* Manual Processing Controls */}
               <div className="space-y-3">
                 <Button
@@ -762,7 +794,9 @@ export default function AdminJobReview() {
                   ) : (
                     <Zap className="h-4 w-4 mr-2" />
                   )}
-                  {job.status === 'pending_review' ? 'Start OCR & Field Extraction' : 'Re-process OCR & Fields'}
+                  {job.status === 'pending_review' ? 'Start OCR & Field Extraction' : 
+                   job.status === 'validation_failed' ? 'Retry with Selected Template' : 
+                   'Re-process OCR & Fields'}
                 </Button>
 
                 {job.extractedFieldValues && selectedTemplateId && (
