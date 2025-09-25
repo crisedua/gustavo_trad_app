@@ -820,9 +820,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/processing-jobs", async (req, res) => {
     try {
+      console.log("Processing job request body:", JSON.stringify(req.body, null, 2));
       const { originalFilePath, userEmail, selectedDocumentTypeId, templateId } = req.body;
 
       if (!originalFilePath) {
+        console.log("Missing originalFilePath. Request body:", req.body);
         return res.status(400).json({ error: "originalFilePath is required" });
       }
 

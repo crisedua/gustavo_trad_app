@@ -247,11 +247,14 @@ export default function DocumentProcessor() {
         console.log('Response data:', responseData);
         console.log('Using filePath:', filePath);
         
-        createJobMutation.mutate({
+        const jobData = {
           originalFilePath: filePath,
           userEmail: currentUserEmail.trim(),
           selectedDocumentTypeId: currentSelectedDocumentTypeIdFresh
-        });
+        };
+        
+        console.log('Creating processing job with data:', jobData);
+        createJobMutation.mutate(jobData);
       }, 100);
     }
   }, [selectedDocumentTypeId, userEmail, documentTypes, createJobMutation, toast]);
