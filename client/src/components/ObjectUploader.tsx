@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
 import { DashboardModal } from "@uppy/react";
 import AwsS3 from "@uppy/aws-s3";
+import XHRUpload from "@uppy/xhr-upload";
 import type { UploadResult } from "@uppy/core";
 import { Button } from "@/components/ui/button";
 
@@ -57,22 +58,53 @@ export function ObjectUploader({
   children,
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
-  const [uppy] = useState(() =>
-    new Uppy({
+  
+  // Check if we're in a Render environment or production
+  const isRenderEnvironment = window.location.hostname.includes('render.com') || 
+                              window.location.hostname.includes('onrender.com') ||
+                              process.env.NODE_ENV === 'production';
+
+  const [uppy] = useState(() => {
+    const uppyInstance = new Uppy({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
       },
       autoProceed: false,
-    })
-      .use(AwsS3, {
+    });
+
+    if (isRenderEnvironment) {
+      // Use XHR upload for Render - get upload URL first, then upload to that endpoint
+      uppyInstance.use(XHRUpload, {
+        endpoint: async (file) => {
+          try {
+            // Get the upload URL from the server
+            const uploadParams = await onGetUploadParameters();
+            return uploadParams.url;
+          } catch (error) {
+            console.error('Failed to get upload URL:', error);
+            throw error;
+          }
+        },
+        method: 'PUT',
+        formData: false, // Send raw file data for PUT requests
+        fieldName: 'file',
+        headers: {
+          'Content-Type': 'application/octet-stream'
+        }
+      });
+    } else {
+      // Use AWS S3 for Replit/development
+      uppyInstance.use(AwsS3, {
         shouldUseMultipart: false,
         getUploadParameters: onGetUploadParameters,
-      })
-      .on("complete", (result) => {
-        onComplete?.(result);
-      })
-  );
+      });
+    }
+
+    return uppyInstance.on("complete", (result) => {
+      onComplete?.(result);
+    });
+  });
 
   return (
     <div>

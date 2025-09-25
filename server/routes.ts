@@ -64,6 +64,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Direct file upload endpoint for Render (handles the actual file upload)
+  app.put("/api/upload/:fileId", async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      
+      // Collect raw body data
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk) => {
+        chunks.push(chunk);
+      });
+      
+      req.on('end', () => {
+        try {
+          const fileBuffer = Buffer.concat(chunks);
+          
+          if (fileBuffer.length === 0) {
+            return res.status(400).json({ error: "No file data received" });
+          }
+          
+          // Save to uploads directory with the specified fileId
+          const uploadsDir = path.join(process.cwd(), 'uploads');
+          if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+          }
+          
+          const targetPath = path.join(uploadsDir, fileId);
+          fs.writeFileSync(targetPath, fileBuffer);
+          
+          console.log(`File uploaded successfully: ${fileId} (${fileBuffer.length} bytes)`);
+          res.json({ 
+            success: true, 
+            fileId,
+            path: `/objects/${fileId}`,
+            size: fileBuffer.length
+          });
+        } catch (error) {
+          console.error("Error processing file data:", error);
+          res.status(500).json({ error: "Failed to process file data" });
+        }
+      });
+      
+      req.on('error', (error) => {
+        console.error("Error receiving file data:", error);
+        res.status(500).json({ error: "Failed to receive file data" });
+      });
+      
+    } catch (error) {
+      console.error("Error handling file upload:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
   // Templates API
   app.get("/api/templates", async (req, res) => {
     try {

@@ -10,11 +10,15 @@ import {
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
+import { RenderStorageService } from "./storage/RenderStorage";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
+// Check if we're running on Render or in production
+const isRenderEnvironment = process.env.RENDER || process.env.NODE_ENV === 'production';
+
 // The object storage client is used to interact with the object storage service.
-export const objectStorageClient = new Storage({
+export const objectStorageClient = isRenderEnvironment ? null : new Storage({
   credentials: {
     audience: "replit",
     subject_token_type: "access_token",
@@ -42,7 +46,14 @@ export class ObjectNotFoundError extends Error {
 
 // The object storage service is used to interact with the object storage service.
 export class ObjectStorageService {
-  constructor() {}
+  private renderStorage: RenderStorageService | null = null;
+
+  constructor() {
+    if (isRenderEnvironment) {
+      this.renderStorage = new RenderStorageService();
+      console.log('Using Render-compatible storage service');
+    }
+  }
 
   // Gets the public object search paths.
   getPublicObjectSearchPaths(): Array<string> {
@@ -78,6 +89,11 @@ export class ObjectStorageService {
 
   // Search for a public object from the search paths.
   async searchPublicObject(filePath: string): Promise<File | null> {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return await this.renderStorage.searchPublicObject(filePath);
+    }
+
     // For local development, check filesystem first
     if (process.env.NODE_ENV === 'development') {
       const localPath = path.join(process.cwd(), 'public-objects', filePath);
@@ -109,18 +125,20 @@ export class ObjectStorageService {
     }
 
     // Fallback to GCS for production or if local file not found
-    for (const searchPath of this.getPublicObjectSearchPaths()) {
-      const fullPath = `${searchPath}/${filePath}`;
+    if (objectStorageClient) {
+      for (const searchPath of this.getPublicObjectSearchPaths()) {
+        const fullPath = `${searchPath}/${filePath}`;
 
-      // Full path format: /<bucket_name>/<object_name>
-      const { bucketName, objectName } = parseObjectPath(fullPath);
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
+        // Full path format: /<bucket_name>/<object_name>
+        const { bucketName, objectName } = parseObjectPath(fullPath);
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
 
-      // Check if file exists
-      const [exists] = await file.exists();
-      if (exists) {
-        return file;
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (exists) {
+          return file;
+        }
       }
     }
 
@@ -129,6 +147,11 @@ export class ObjectStorageService {
 
   // Downloads an object to the response.
   async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600) {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return await this.renderStorage.downloadObject(file, res, cacheTtlSec);
+    }
+
     try {
       // Get file metadata
       const [metadata] = await file.getMetadata();
@@ -173,6 +196,11 @@ export class ObjectStorageService {
 
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<string> {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return await this.renderStorage.getObjectEntityUploadURL();
+    }
+
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -197,6 +225,11 @@ export class ObjectStorageService {
 
   // Gets the object entity file from the object path.
   async getObjectEntityFile(objectPath: string): Promise<File> {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return await this.renderStorage.getObjectEntityFile(objectPath);
+    }
+
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();
     }
@@ -213,6 +246,11 @@ export class ObjectStorageService {
     }
     const objectEntityPath = `${entityDir}${entityId}`;
     const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+    
+    if (!objectStorageClient) {
+      throw new ObjectNotFoundError();
+    }
+    
     const bucket = objectStorageClient.bucket(bucketName);
     const objectFile = bucket.file(objectName);
     const [exists] = await objectFile.exists();
@@ -225,6 +263,11 @@ export class ObjectStorageService {
   normalizeObjectEntityPath(
     rawPath: string,
   ): string {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return this.renderStorage.normalizeObjectEntityPath(rawPath);
+    }
+
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
     }
@@ -252,6 +295,11 @@ export class ObjectStorageService {
     rawPath: string,
     aclPolicy: ObjectAclPolicy
   ): Promise<string> {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return await this.renderStorage.trySetObjectEntityAclPolicy(rawPath, aclPolicy);
+    }
+
     const normalizedPath = this.normalizeObjectEntityPath(rawPath);
     if (!normalizedPath.startsWith("/")) {
       return normalizedPath;
@@ -272,6 +320,11 @@ export class ObjectStorageService {
     objectFile: File;
     requestedPermission?: ObjectPermission;
   }): Promise<boolean> {
+    // Use Render storage if available
+    if (this.renderStorage) {
+      return await this.renderStorage.canAccessObjectEntity({ userId, objectFile, requestedPermission });
+    }
+
     return canAccessObject({
       userId,
       objectFile,
