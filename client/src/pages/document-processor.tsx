@@ -226,8 +226,12 @@ export default function DocumentProcessor() {
         console.log('Creating processing job with documentTypeId:', currentSelectedDocumentTypeIdFresh, 'email:', currentUserEmail);
         
         // Start processing
+        // Handle both Render and Replit upload response formats
+        const filePath = uploadedFile.uploadURL || uploadedFile.path || '';
+        console.log('Upload result:', uploadedFile, 'Using filePath:', filePath);
+        
         createJobMutation.mutate({
-          originalFilePath: uploadedFile.uploadURL || '',
+          originalFilePath: filePath,
           userEmail: currentUserEmail.trim(),
           selectedDocumentTypeId: currentSelectedDocumentTypeIdFresh
         });

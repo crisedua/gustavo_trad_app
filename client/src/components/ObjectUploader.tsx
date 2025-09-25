@@ -91,6 +91,22 @@ export function ObjectUploader({
         fieldName: 'file',
         headers: {
           'Content-Type': 'application/octet-stream'
+        },
+        getResponseData: (responseText, response) => {
+          try {
+            const data = JSON.parse(responseText);
+            console.log('Render upload response:', data);
+            // Return the path as uploadURL for compatibility
+            return {
+              uploadURL: data.path,
+              path: data.path,
+              fileId: data.fileId,
+              success: data.success
+            };
+          } catch (e) {
+            console.error('Failed to parse upload response:', e, 'Response:', responseText);
+            return { uploadURL: '', path: '' };
+          }
         }
       });
     } else {
