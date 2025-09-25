@@ -80,6 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const fileBuffer = Buffer.concat(chunks);
           
           if (fileBuffer.length === 0) {
+            res.setHeader('Content-Type', 'application/json');
             return res.status(400).json({ error: "No file data received" });
           }
           
@@ -93,6 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fs.writeFileSync(targetPath, fileBuffer);
           
           console.log(`File uploaded successfully: ${fileId} (${fileBuffer.length} bytes)`);
+          res.setHeader('Content-Type', 'application/json');
           res.json({ 
             success: true, 
             fileId,
@@ -101,17 +103,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } catch (error) {
           console.error("Error processing file data:", error);
+          res.setHeader('Content-Type', 'application/json');
           res.status(500).json({ error: "Failed to process file data" });
         }
       });
       
       req.on('error', (error) => {
         console.error("Error receiving file data:", error);
+        res.setHeader('Content-Type', 'application/json');
         res.status(500).json({ error: "Failed to receive file data" });
       });
       
     } catch (error) {
       console.error("Error handling file upload:", error);
+      res.setHeader('Content-Type', 'application/json');
       res.status(500).json({ error: "Failed to upload file" });
     }
   });

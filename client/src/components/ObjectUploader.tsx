@@ -122,10 +122,35 @@ export function ObjectUploader({
       console.log('Upload success event:', file, response);
       // Store the response data on the file object for later access
       if (file && response && response.body) {
-        const responseData = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
-        file.uploadURL = responseData.path || responseData.uploadURL || file.uploadURL;
-        file.path = responseData.path;
-        file.fileId = responseData.fileId;
+        try {
+          let responseData;
+          if (typeof response.body === 'string') {
+            // Try to parse as JSON, but handle non-JSON responses
+            if (response.body.startsWith('{') || response.body.startsWith('[')) {
+              responseData = JSON.parse(response.body);
+            } else {
+              console.warn('Non-JSON response body:', response.body);
+              responseData = {};
+            }
+          } else {
+            responseData = response.body;
+          }
+          
+          console.log('Parsed response data:', responseData);
+          file.uploadURL = responseData.path || responseData.uploadURL || file.uploadURL;
+          file.path = responseData.path;
+          file.fileId = responseData.fileId;
+        } catch (error) {
+          console.error('Error parsing upload response:', error, 'Response body:', response.body);
+          // Fallback: extract file ID from upload URL if available
+          if (file.uploadURL && file.uploadURL.includes('/api/upload/')) {
+            const fileId = file.uploadURL.split('/api/upload/')[1];
+            file.uploadURL = `/objects/${fileId}`;
+            file.path = `/objects/${fileId}`;
+            file.fileId = fileId;
+            console.log('Using fallback path:', file.path);
+          }
+        }
       }
     });
 
