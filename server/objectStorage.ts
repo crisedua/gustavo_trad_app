@@ -49,9 +49,16 @@ export class ObjectStorageService {
   private renderStorage: RenderStorageService | null = null;
 
   constructor() {
+    console.log('ObjectStorageService constructor - Environment check:');
+    console.log('  process.env.RENDER:', process.env.RENDER);
+    console.log('  process.env.NODE_ENV:', process.env.NODE_ENV);
+    console.log('  isRenderEnvironment:', isRenderEnvironment);
+    
     if (isRenderEnvironment) {
       this.renderStorage = new RenderStorageService();
       console.log('Using Render-compatible storage service');
+    } else {
+      console.log('Using Replit/GCS storage service');
     }
   }
 
@@ -196,8 +203,10 @@ export class ObjectStorageService {
 
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<string> {
+    console.log("getObjectEntityUploadURL called, renderStorage:", !!this.renderStorage);
     // Use Render storage if available
     if (this.renderStorage) {
+      console.log("Using Render storage for upload URL");
       return await this.renderStorage.getObjectEntityUploadURL();
     }
 
