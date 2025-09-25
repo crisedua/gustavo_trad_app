@@ -117,6 +117,18 @@ export function ObjectUploader({
       });
     }
 
+    // Handle upload success to store response data
+    uppyInstance.on('upload-success', (file, response) => {
+      console.log('Upload success event:', file, response);
+      // Store the response data on the file object for later access
+      if (file && response && response.body) {
+        const responseData = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+        file.uploadURL = responseData.path || responseData.uploadURL || file.uploadURL;
+        file.path = responseData.path;
+        file.fileId = responseData.fileId;
+      }
+    });
+
     return uppyInstance.on("complete", (result) => {
       onComplete?.(result);
     });

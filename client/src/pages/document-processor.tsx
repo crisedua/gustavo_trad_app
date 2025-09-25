@@ -227,8 +227,25 @@ export default function DocumentProcessor() {
         
         // Start processing
         // Handle both Render and Replit upload response formats
-        const filePath = uploadedFile.uploadURL || uploadedFile.path || '';
-        console.log('Upload result:', uploadedFile, 'Using filePath:', filePath);
+        // For Uppy, the response data is in uploadedFile.response
+        const responseData = uploadedFile.response || {};
+        let filePath = uploadedFile.uploadURL || responseData.uploadURL || responseData.path || uploadedFile.path || '';
+        
+        // If we still don't have a path, try to extract from response body or construct from upload URL
+        if (!filePath && responseData.body) {
+          const bodyData = typeof responseData.body === 'string' ? JSON.parse(responseData.body) : responseData.body;
+          filePath = bodyData.path || bodyData.uploadURL || '';
+        }
+        
+        // Last resort: if we have an upload URL that looks like a Render endpoint, extract the file ID
+        if (!filePath && uploadedFile.uploadURL && uploadedFile.uploadURL.includes('/api/upload/')) {
+          const fileId = uploadedFile.uploadURL.split('/api/upload/')[1];
+          filePath = `/objects/${fileId}`;
+        }
+        
+        console.log('Upload result:', uploadedFile);
+        console.log('Response data:', responseData);
+        console.log('Using filePath:', filePath);
         
         createJobMutation.mutate({
           originalFilePath: filePath,
